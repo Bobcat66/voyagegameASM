@@ -39,16 +39,24 @@ vgstrlen:
         jmp .Lvgrstrlen.loop
     .Lvgrstrlen.end:
     ret
+size vgstrlen, . - vgstrlen
 
 # long vgprint(char*): prints a string literal to console
 .type vgprint, @function
 vgprint:
-    push %rdi
+    push %rdi                               # Store char pointer in stack, as it is volatile
     call vgstrlen
-    pop %rdi
+    pop %rsi                                # pop char pointer to stack and stor in rsi (expected by syscall ABI)                         
     movq %rax, %rdx                         # move strlen to rdx (expected by syscall ABI)
-    movq $1, %rax                           # syscall WRITE
-    movq $1, %rdi                           # file descriptor stdout
+    push %rdx                               # store strlen so we can return it
+    movq $1, %rax                           # syscall write (1)
+    movq $1, %rdi                           # file descriptor stdout (1)
+    syscall
+    movq %rdx, %rax
+    ret
+size vgprint, . - vgprint
+
+
 # void updateMax(void): updates maximums based on level
 .type updateMax, @function
 updateMax:
