@@ -5,28 +5,50 @@
 
 .section .text
 
-# void srand(void): seeds rng based on system clock
-.type srand, @function
-srand:
-    mov $288, %rax                          # syscall clock_gettime
-    mov $0, %rdi                            # CLOCK_REALTIME
-    lea seed_buf(%rip) %rdi
+# void vgsrand(void): seeds rng based on system clock
+.type vgsrand, @function
+vgsrand:
+    movq $288, %rax                          # syscall clock_gettime
+    movq $0, %rdi                            # CLOCK_REALTIME
+    lea seed_buf(%rip), %rdi
     syscall
     ret
-.size srand, . - srand    
+.size vgsrand, . - vgsrand    
 
-# int rand(int): generates a random integer between 0 and arg0
-.type rand, @function
-rand:
+# int vgrand(int): generates a random integer between 0 and arg0
+.type vgrand, @function
+vgrand:
     movl seed_buf+4(%rip), %eax             # Uses the lower 4 bytes of tv_sec as the seed
     imull $A, %eax, %eax,
     addl $C, %eax
     xor %edx, %edx
     idivl %edi
-    movl %edx %eax
+    movl %edx, %eax
     ret
-.size rand, . - rand
+.size vgrand, . - vgrand
 
+# long vgstrlen(char*): returns length of string literal
+.type vgstrlen, @function
+vgstrlen:
+    xorq %rax, %rax
+    .Lvgrstrlen.loop:
+        movb (%rdi,%rax,1), %sil
+        test %sil, %sil 
+        jz .Lvgrstrlen.end                  # If sil == 0, goto .Lvgrstrlen.end
+        inc %rax
+        jmp .Lvgrstrlen.loop
+    .Lvgrstrlen.end:
+    ret
+
+# long vgprint(char*): prints a string literal to console
+.type vgprint, @function
+vgprint:
+    push %rdi
+    call vgstrlen
+    pop %rdi
+    movq %rax, %rdx                         # move strlen to rdx (expected by syscall ABI)
+    movq $1, %rax                           # syscall WRITE
+    movq $1, %rdi                           # file descriptor stdout
 # void updateMax(void): updates maximums based on level
 .type updateMax, @function
 updateMax:
@@ -66,10 +88,13 @@ updateMax:
 # 
 .type voyage, @function
 voyage:
+    push %rbx                               # Saves nonvolatile register
+
     movl %18, voyage_weeks_left(%rip)
     movl %0, voyage_current_week(%rip)
     movl %3, voyage_resupply_time(%rip)
     .Lgameloop:
+        # Prints game data for player
         lea str1(%rip), %rdi
         movl voyage_current_week(%rip), %rsi
         call printf
@@ -114,6 +139,53 @@ voyage:
         movl voyage_resupply_time(%rip), %rsi
         call printf
 
+        # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in rbx
+        movl $9, %rdi
+        call vgrand
+        movl %rax, %rbx
+
+        # Compares RNG result and jumps
+        cmpl %0, %rbx 
+        je .Lbecalmed
+
+        cmpl %1, %rbx 
+        je .Lbecalmed
+
+        cmpl %2, %rbx 
+        je .Lstorm
+
+        cmpl %3, %rbx 
+        je .Lmanowar
+
+        cmpl %4, %rbx 
+        je .Lmerchantman
+
+        cmpl %5, %rbx 
+        je .Lmerchantman
+
+        jmp .Lnoincident                    # default
+
+        .Lbecalmed:
+
+        .Lstorm:
+
+        .Lmanowar:
+
+        .Lmerchantman:
+
+        .Lnoincident:
+
+
+    .Lfinishvoyage:
+    pop %rbx
+    movl $1, %rax
+    ret
+    .Lexitgame:
+    pop %rbx
+    movl $1, %rax
+    ret
+
+
 
 .size voyage, . - voyage
 
@@ -122,7 +194,7 @@ voyage:
 .globl main
 .type main, @function
 main:
-    call srand                              # Seed RNG
+    call vgsrand                            # Seed RNG
     .Lmain.loop:
         # Begin game
         movl $300, ship_limes(%rip)
