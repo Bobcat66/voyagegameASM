@@ -70,6 +70,49 @@ voyage:
     movl %0, voyage_current_week(%rip)
     movl %3, voyage_resupply_time(%rip)
     .Lgameloop:
+        lea str1(%rip), %rdi
+        movl voyage_current_week(%rip), %rsi
+        call printf
+
+        lea str2(%rip), %rdi
+        movl voyage_weeks_left(%rip), %rsi
+        call printf
+
+        lea str3(%rip), %rdi
+        movl ship_level(%rip), %rsi
+        call printf
+
+        lea str4(%rip), %rdi
+        movl ship_limes(%rip), %rsi
+        movl ship_max_limes(%rip), %rdx
+        call printf
+
+        lea str5(%rip), %rdi
+        movl ship_mateys(%rip), %rsi
+        movl ship_max_mateys(%rip), %rdx
+        call printf
+
+        lea str6(%rip), %rdi
+        movl ship_booty(%rip), %rsi
+        call printf
+
+        lea str7(%rip), %rdi
+        movl ship_health(%rip), %rsi
+        movl ship_max_heath(%rip), %rdx
+        call printf
+
+        lea str8(%rip), %rdi
+        movl ship_dubloons(%rip), %rsi
+        call printf
+
+        lea str9(%rip), %rdi
+        movl ship_cannons(%rip), %rsi
+        movl ship_max_cannons(%rip), %rdx
+        call printf
+
+        lea str10(%rip), %rdi
+        movl voyage_resupply_time(%rip), %rsi
+        call printf
 
 
 .size voyage, . - voyage
@@ -102,11 +145,11 @@ str0: .ascii "You are Captain John Birdman, pirate captain of the HMS Pirate Shi
 str1: .ascii "----------Week %d----------\n\0"
 str2: .ascii "Weeks left: %d\n\0"
 str3: .ascii "Ship level: %d\n\0"
-str4: .ascii "Supplies: %d/%d\n\0"
-str5: "Crew: %d/%d\n\0"
-str6: "Cargo: %d/%d\n\0"
+str4: .ascii "Limes: %d/%d\n\0"
+str5: "Mateys: %d/%d\n\0"
+str6: "Booty: %d/%d\n\0"
 str7: "Ship health: %d/%d\n\0"
-str8: "Funds: %d\n\0"
+str8: "Dubloons: %d\n\0"
 str9: "Cannons: %d/%d\n\0"
 str10: "Weeks until resupply: %d\n\0"
 
