@@ -19,9 +19,10 @@ vgsrand:
 .type vgrand, @function
 vgrand:
     movl seed_buf+4(%rip), %eax             # Uses the lower 4 bytes of tv_sec as the seed
-    imull $A, %eax, %eax,
+    imull $A, %eax, %eax
     addl $C, %eax
-    xor %edx, %edx
+    movl %eax, seed_buf+4(%rip)             # updates seed
+    xorl %edx, %edx
     idivl %edi
     movl %edx, %eax
     ret
@@ -35,7 +36,7 @@ vgstrlen:
         movb (%rdi,%rax,1), %sil
         test %sil, %sil 
         jz .Lvgrstrlen.end                  # If sil == 0, goto .Lvgrstrlen.end
-        inc %rax
+        incq %rax
         jmp .Lvgrstrlen.loop
     .Lvgrstrlen.end:
     ret
@@ -45,14 +46,14 @@ size vgstrlen, . - vgstrlen
 .type vgprint, @function
 vgprint:
     push %rdi                               # Store char pointer in stack, as it is volatile
-    call vgstrlen
+    callq vgstrlen
     pop %rsi                                # pop char pointer to stack and stor in rsi (expected by syscall ABI)                         
     movq %rax, %rdx                         # move strlen to rdx (expected by syscall ABI)
     push %rdx                               # store strlen so we can return it
     movq $1, %rax                           # syscall write (1)
     movq $1, %rdi                           # file descriptor stdout (1)
     syscall
-    movq %rdx, %rax
+    popq %rax
     ret
 size vgprint, . - vgprint
 
@@ -88,109 +89,189 @@ updateMax:
     movl ship_level(%rip), %eax
     imul $30, %eax, %eax
     addl $70, %eax
-    movl %eax, ship_max_mateys(%rip)
+    movl %eax, ship_max_health(%rip)
 
     ret
 .size updateMax, . - updateMax
 
+# int updateStat(int* stat, int delta): returns a copy of the updated stat's value. Stat will be set at zero if adding the delta would make it negative
+.type updateStat, @function
+updateStat:
+    movl (%rdi), %eax
+    addl %esi, %eax
+    cmpl $1, %eax
+    jge .LupdateStat.exit                   # Jumps to exit if result is positive
+    movl $0, %eax                           # Otherwise, sets stat to zero
+    .LupdateStat.exit:
+    movl %eax, (%rdi)
+    ret
+.size updateStat, . - updateStat
+
 # 
 .type voyage, @function
 voyage:
-    push %rbx                               # Saves nonvolatile register
+
+    # Sets up local stack frame
+    pushq %rbp
+    movq %rsp, %rbp
+    subq $64, %rsp                          # Allocates 64 bytes of stack space. Todo: figure out how much space to allocate        
+
+    pushq %rbx                              # Saves nonvolatile register
 
     movl %18, voyage_weeks_left(%rip)
     movl %0, voyage_current_week(%rip)
     movl %3, voyage_resupply_time(%rip)
-    .Lgameloop:
+    .Lvoyage.loop:
         # Prints game data for player
-        lea str1(%rip), %rdi
-        movl voyage_current_week(%rip), %rsi
+        leaq str1(%rip), %rdi
+        movl voyage_current_week(%rip), %esi
         call printf
 
-        lea str2(%rip), %rdi
-        movl voyage_weeks_left(%rip), %rsi
+        leaq str2(%rip), %rdi
+        movl voyage_weeks_left(%rip), %esi
         call printf
 
-        lea str3(%rip), %rdi
-        movl ship_level(%rip), %rsi
+        leaq str3(%rip), %rdi
+        movl ship_level(%rip), %esi
         call printf
 
-        lea str4(%rip), %rdi
-        movl ship_limes(%rip), %rsi
-        movl ship_max_limes(%rip), %rdx
+        leaq str4(%rip), %rdi
+        movl ship_limes(%rip), %esi
+        movl ship_max_limes(%rip), %edx
         call printf
 
-        lea str5(%rip), %rdi
-        movl ship_mateys(%rip), %rsi
-        movl ship_max_mateys(%rip), %rdx
+        leaq str5(%rip), %rdi
+        movl ship_mateys(%rip), %esi
+        movl ship_max_mateys(%rip), %edx
         call printf
 
-        lea str6(%rip), %rdi
-        movl ship_booty(%rip), %rsi
+        leaq str6(%rip), %rdi
+        movl ship_booty(%rip), %esi
         call printf
 
-        lea str7(%rip), %rdi
-        movl ship_health(%rip), %rsi
-        movl ship_max_heath(%rip), %rdx
+        leaq str7(%rip), %rdi
+        movl ship_health(%rip), %esi
+        movl ship_max_health(%rip), %edx
         call printf
 
-        lea str8(%rip), %rdi
-        movl ship_dubloons(%rip), %rsi
+        leaq str8(%rip), %rdi
+        movl ship_dubloons(%rip), %esi
         call printf
 
-        lea str9(%rip), %rdi
-        movl ship_cannons(%rip), %rsi
-        movl ship_max_cannons(%rip), %rdx
+        leaq str9(%rip), %rdi
+        movl ship_cannons(%rip), %esi
+        movl ship_max_cannons(%rip), %edx
         call printf
 
-        lea str10(%rip), %rdi
-        movl voyage_resupply_time(%rip), %rsi
+        leaq str10(%rip), %rdi
+        movl voyage_resupply_time(%rip), %esi
         call printf
 
-        # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in rbx
-        movl $9, %rdi
+        # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in ebx
+        movl $9, %edi
         call vgrand
-        movl %rax, %rbx
+        movl %eax, %ebx
 
         # Compares RNG result and jumps
-        cmpl %0, %rbx 
-        je .Lbecalmed
+        cmpl %0, %ebx 
+        je .Lvoyage.becalmed
 
-        cmpl %1, %rbx 
-        je .Lbecalmed
+        cmpl %1, %ebx 
+        je .Lvoyage.becalmed
 
-        cmpl %2, %rbx 
-        je .Lstorm
+        cmpl %2, %ebx 
+        je .Lvoyage.storm
 
-        cmpl %3, %rbx 
-        je .Lmanowar
+        cmpl %3, %ebx 
+        je .Lvoyage.manowar
 
-        cmpl %4, %rbx 
-        je .Lmerchantman
+        cmpl %4, %ebx 
+        je .Lvoyage.merchantman
 
-        cmpl %5, %rbx 
-        je .Lmerchantman
+        cmpl %5, %ebx 
+        je .Lvoyage.merchantman
 
-        jmp .Lnoincident                    # default
+        jmp .Lvoyage.noincident             # default
 
-        .Lbecalmed:
+        .Lvoyage.becalmed:
+            incl voyage_weeks_left(%rip)
+            incl voyage_resupply_time(%rip)
+            leaq str11(%rip), %rdi
+            call vgprint
+            jmp .Lvoyage.loop.end
+        .Lvoyage.storm:
+            movl $50, %edi
+            call vgrand
+            movl %eax, -4(%rbp)             # Mateys killed
 
-        .Lstorm:
+            movl %eax, %esi
+            leaq ship_mateys(%rip), %rdi
+            call updateStat                 # Update mateys
 
-        .Lmanowar:
+            movl $50, %edi
+            call vgrand
+            movl %eax, -8(%rbp)             # Ship damage
 
-        .Lmerchantman:
+            movl %eax, %esi
+            leaq ship_health(%rip), %rdi
+            call updateStat                 # Update health
 
-        .Lnoincident:
+            movl $100, %edi
+            call vgrand
+            movl %eax, -12(%rbp)            # Booty lost
+
+            movl %eax, %esi
+            leaq ship_booty(%rip), %rdi
+            call updateStat                 # Update booty
+
+            # If vgrand returns 0, or the ship damage is greater than the ship's health, the ship sinks
+            movl $100, %edi
+            call vgrand
+            test %eax, %eax
+            jz 1f
+            movl ship_health(%rip), %eax    # Retrieve damage
+            test %eax, %eax
+            jz 1f
+            jmp 2f
+            1:
+                leaq str12(%rip), %rdi
+                call vgprint
+                movq $1, %rax
+                jmp .Lvoyage.exit
+            2:
+                leaq str13(%rip), %rdi
+                call vgprint
+
+                leaq str14(%rip), %rdi
+                movl -4(%rbp), %esi
+                call printf
+
+                leaq str15(%rip), %rdi
+                movl -8(%rbp), %esi
+                call printf
+
+                leaq str16(%rip), %rdi
+                movl -12(%rbp), %esi
+                call printf
+
+                jmp .Lvoyage.loop.end
 
 
-    .Lfinishvoyage:
-    pop %rbx
-    movl $1, %rax
-    ret
-    .Lexitgame:
-    pop %rbx
-    movl $1, %rax
+        .Lvoyage.manowar:
+
+        .Lvoyage.merchantman:
+
+        .Lvoyage.noincident:
+
+        .Lvoyage.loop.end:
+        jmp .Lvoyage.loop
+    .Lvoyage.exit:
+    popq %rbx
+
+    # Tear down local stack frame
+    movq %rbp, %rsp
+    popq %rbp
+
     ret
 
 
@@ -198,7 +279,7 @@ voyage:
 .size voyage, . - voyage
 
 
-# The main entry point is called 'main' and not '_start' because this program is designed to run inside the C runtime
+# The main entry point is called 'main' and not '_start' because this program is designed to run inside the C runtime environment
 .globl main
 .type main, @function
 main:
@@ -222,16 +303,26 @@ main:
 
 .section .rodata
 str0: .ascii "You are Captain John Birdman, pirate captain of the HMS Pirate Ship\n\0"
+
 str1: .ascii "----------Week %d----------\n\0"
 str2: .ascii "Weeks left: %d\n\0"
 str3: .ascii "Ship level: %d\n\0"
 str4: .ascii "Limes: %d/%d\n\0"
-str5: "Mateys: %d/%d\n\0"
-str6: "Booty: %d/%d\n\0"
-str7: "Ship health: %d/%d\n\0"
-str8: "Dubloons: %d\n\0"
-str9: "Cannons: %d/%d\n\0"
-str10: "Weeks until resupply: %d\n\0"
+str5: .ascii "Mateys: %d/%d\n\0"
+str6: .ascii "Booty: %d/%d\n\0"
+str7: .ascii "Ship health: %d/%d\n\0"
+str8: .ascii "Dubloons: %d\n\0"
+str9: .ascii "Cannons: %d/%d\n\0"
+str10: .ascii "Weeks until resupply: %d\n\0"
+
+str11: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
+
+str12: .ascii "The HMS Pirate Ship was destroyed in a storm!\n\0"
+
+str13: .ascii "The HMS Pirate Ship caught in a storm!\n\0"
+str14: .ascii "Mateys killed: %d\n\0"
+str15: .ascii "Ship damage: %d\n\0"
+str16: .ascii "Booty lost: %d\n\0"
 
 .section .data
 
@@ -256,7 +347,7 @@ return_voyage: .byte 1                      # whether or not the game is on a re
 .lcomm ship_max_mateys, 4
 .lcomm ship_max_booty, 4
 .lcomm ship_max_cannons, 4
-.lcomm ship_max_heath, 4
+.lcomm ship_max_health, 4
 
 
 
