@@ -1,5 +1,4 @@
 .extern printf                              # from the C standard library
-.extern scanf                               # from the C standard library
 .extern vgsrand
 .extern vgrand
 .extern vgrandsd
@@ -530,20 +529,109 @@ voyage:
             je .Lvoyage.merchantman.attack
 
             cmpb $110, %al
-            je .Lvoyage.merchantman.end
+            je .Lvoyage.loop.end
 
             movq $2, %rax                   # Error on unrecognized input
             jmp .Lvoyage.exit
 
             .Lvoyage.merchantman.attack:
+                call vgrandsd               # stores random double between 0 and 1 in xmm0
+                # xmm0 must be LESS THAN the win probability to win
+                ucomisd %xmm0, -20(%rbp)    # compares xmm0 to win chance
+                ja 1f                       
+                jb 2f
+                1:                          # Merchantman wins
+                    movl $40, %edi
+                    call vgrand
+                    movl %eax, -24(%rbp)    # Mateys lost
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
 
-            .Lvoyage.merchantman.end:
+                    movl $40, %edi
+                    call vgrand
+                    movl %eax, -28(%rbp)    # Damage taken
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
+                    # Ship health is stored in eax
 
+                    or ship_mateys(%rip), %eax
+                    jz 1f
+                    jmp 2f
+                    
+                    1:                      # HMS Pirate Ship sinks
+                        lea str14(%rip), %rdi
+                        call vgprint
 
+                        movq $1, %rax
+                        jmp .Lvoyage.exit
+                    2:                      # HMS Pirate Ship survives
+                        lea str13(%rip), %rdi
+                        call vgprint
 
+                        lea fstr10(%rip), %rdi
+                        movl -24(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
 
+                        lea fstr11(%rip), %rdi
+                        movl -28(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
 
+                        jmp .Lvoyage.loop.end
 
+                2:                          # Player wins
+                    movl $20, %edi
+                    call vgrand
+                    movl %eax, -24(%rbp)    # Mateys lost
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
+
+                    movl $10, %edi
+                    call vgrand
+                    movl %eax, -28(%rbp)    # Damage taken
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
+                    # Ship health is stored in eax
+
+                    or ship_mateys(%rip), %eax
+                    jz 1f                   # If either mateys or health are 0, jump to pyrrhic victory
+                    jmp 2f                  # Otherwise, jump to victory
+
+                    1:                      # Pyrrhic victory
+                        lea str16(%rip), %rdi
+                        call vgprint
+
+                        movq $1, %rax
+                        jmp .Lvoyage.exit
+                    2:                      # Victory
+                        lea str15(%rip), %rdi
+                        call printf
+
+                        lea fstr10(%rip), %rdi
+                        movl -24(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea fstr11(%rip), %rdi
+                        movl -28(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea fstr19(%rip), %rdi
+                        movl -12(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea ship_booty(%rip), %rdi
+                        lea ship_max_booty(%rip), %rsi
+                        movl -12(%rbp), %edx
+                        call updateStatWithMax
+                        jmp .Lvoyage.loop.end
 
     .Lvoyage.loop.end:
     jmp .Lvoyage.loop
@@ -611,7 +699,6 @@ str1: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
 
 # Storm messages
 str2: .ascii "The HMS Pirate Ship was destroyed in a storm!\n\0"
-
 str3: .ascii "The HMS Pirate Ship caught in a storm!\n\0"
 
 # Warship encounter messages
@@ -621,11 +708,13 @@ str5: .ascii "Frigate\n\0"
 fstr13: .ascii "You are being attacked by a %s\n\0"
 fstr14: .ascii "Your cannons: %d\n\0"
 fstr15: .ascii "Chance of success if you fight: %.2f%%\n\0"
+
 str6: .ascii "Chance of success if you flee: 90.00%\n\0"
 str7: .ascii "1 to fight\n\0"
 str8: .ascii "2 to flee\n\0"
 str9: .ascii "Select one: \0"
 str10: .ascii "DEFEAT: The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
+
 fstr16: .ascii "PYRRHIC VICTORY: Although you sank the %s, it was able to take you down with it!\n\0"
 fstr17: .ascii "VICTORY: You successfully defeated the %s and took it as your prize!\n\0"
 fstr20: .ascii "VICTORY: The HMS Pirate Ship successfully outran the %s!\n\0"
@@ -634,9 +723,21 @@ fstr22: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship, and sent her to
 
 # Merchantman encounter
 str11: .ascii "You see a merchantman!\n\0"
+
 fstr23: .ascii "Chance of success if you attack: %.2f%%\n\0"
+
 str12: .ascii "Do you want to attack? [y/n]: \0"
+str13: .ascii "DEFEAT: The merchantman successfully defended against you!\n\0"
+str14: .ascii "DEFEAT: The merchantman sent the HMS Pirate Ship to Dany Jones' Locker!\n\0"
+str15: .ascii "VICTORY: You successfully attacked the merchantman and plundered all its booty!\n\0"
+str16: .ascii "PYRRHIC VICTORY: You successfully attacked the merchantman, but the HMS Pirate Ship took too much damage!\n\0"
+
+
+
+
 loot_table: .long 500, 500, 500, 500, 600, 600, 600, 700, 700, 1000
+
+
 .section .data
 
 game_state: .byte 0                         # 0 means game is active, 1 means game not active, 2 means error
