@@ -56,6 +56,32 @@ updateStat:
     ret
 .size updateStat, . - updateStat
 
+# int updateStatWithMax(int* stat, int* max, int delta): returns a copy of the updated stat's value. Stat will be set at zero if adding the delta would make it negative, and will be set to max if adding delta would make it higher than max
+.type updateStatWithMax, @function
+updateStat:
+    movl (%rdi), %eax
+    addl %edx, %eax
+    movl (%rsi), %esi                       # Dereference pointer at rsi and store value in esi
+
+    cmpl %esi, %eax
+    jg .LupdateStat.overflow                # Jump to overflow case if stat is greater than max
+
+    cmpl $1, %eax
+    jge .LupdateStat.exit                   # Jumps to exit if result is positive
+    jmp .LupdateStat.underflow              # Otherwise, jump to underflow case
+
+    .LupdateStat.overflow:
+        movl %esi, %eax                     # Sets stat to max if overflow
+        jmp .LupdateStat.exit               
+    .LupdateStat.underflow:
+        xorl %eax, %eax                     # Sets stat to zero if underflow
+        jmp .LupdateStat.exit
+    
+    .LupdateStat.exit:
+    movl %eax, (%rdi)
+    ret
+.size updateStatWithMax, . - updateStatWithMax
+
 # 
 .type voyage, @function
 voyage:
@@ -166,6 +192,7 @@ voyage:
 
             movl %eax, %esi
             lea ship_mateys(%rip), %rdi
+            negl %esi
             call updateStat                 # Update mateys
 
             movl $50, %edi
@@ -174,6 +201,7 @@ voyage:
 
             movl %eax, %esi
             lea ship_health(%rip), %rdi
+            negl %esi
             call updateStat                 # Update health
 
             movl $100, %edi
@@ -182,6 +210,7 @@ voyage:
 
             movl %eax, %esi
             lea ship_booty(%rip), %rdi
+            negl %esi
             call updateStat                 # Update booty
 
             # If vgrand returns 0, or the ship damage is greater than the ship's health, the ship sinks
@@ -305,24 +334,42 @@ voyage:
                 ja 1f                       
                 jb 2f
                 1:                          # Warship wins
-                    lea fstr16(%rip), %rdi
-                    movq -8(%rbp), %rsp
-                    xorq %rax, %rax
-                    call printf
+                    lea str10(%rip), %rdi
+                    call print
                     movq $1, %rax
                     jmp .Lvoyage.exit
                 2:                          # Player wins
                     movl $40, %edi
                     call vgrand
                     movl %eax, -24(%rbp)    # Mateys lost
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
 
                     movl $30, %edi
                     call vgrand
                     movl %eax, -28(%rbp)    # Damage taken
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
+                    # Ship health is stored in eax
 
+                    or ship_mateys(%rip), %eax
+                    jz 1f                   # If either mateys or health are 0, jump to pyrrhic victory
+                    jmp 2f                  # Otherwise, jump to victory
 
-
-                
+                    1:                      # Pyrrhic victory
+                        lea fstr16(%rip), %rdi
+                        movq -8(%rbp), %rsi
+                        xorq %rax, %rax
+                        call printf
+                        movq $1, %rax
+                        jmp .Lvoyage.exit
+                    2:                      # Victory
+                        lea fstr17(%rip), %rdi
+                        movq -8(%rbp), %rsi
+                        xorq %rax, %rax
+                        call printf
             .Lvoyage.warship.flee:
 
 
@@ -418,9 +465,9 @@ str6: .ascii "Chance of success if you flee: 90.00%\n\0"
 str7: .ascii "1 to fight\n\0"
 str8: .ascii "2 to flee\n\0"
 str9: .ascii "Select one: \0"
-fstr16: .ascii "DEFEAT: The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
-fstr17: .ascii "PYRRHIC VICTORY: Although you sank the %s, it was able to take you down with it!"
-fstr18: .ascii "VICTORY: You successfully defeated the %s and took its cargo as your prize!"
+str10: .ascii "DEFEAT: The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
+fstr16: .ascii "PYRRHIC VICTORY: Although you sank the %s, it was able to take you down with it!\n\0"
+fstr17: .ascii "VICTORY: You successfully defeated the %s and took it as your prize!\n\0"
 
 .section .data
 
