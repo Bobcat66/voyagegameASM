@@ -198,7 +198,7 @@ voyage:
         cmpl %5, %eax 
         je .Lvoyage.merchantman
 
-        jmp .Lvoyage.noincident             # default
+        jmp .Lvoyage.loop.end               # default
 
         # ebx no longer needs to be preserved after this point
         .Lvoyage.becalmed:
@@ -282,7 +282,7 @@ voyage:
             call vgrand
             test %eax, %eax
             jz .Lvoyage.warship.manowar
-            jnz .Lvoyage.warship.manowar
+            jnz .Lvoyage.warship.frigate
 
             .Lvoyage.warship.manowar:
                 lea manowarName(%rip), %rdi
@@ -323,7 +323,8 @@ voyage:
             call printf
 
             movsd -20(%rsp), %xmm0
-            mulsd $100, %xmm0
+            movsd $100.0, %xmm1
+            mulsd %xmm1, %xmm0
             lea fstr15(%rip), %rdi
             movq $1, %rax
             call printf
@@ -353,6 +354,9 @@ voyage:
 
             cmpb $50, %al                   
             je .Lvoyage.warship.flee        # checks if user typed '2'
+
+            movq $2, %rax                 
+            jmp .Lvoyage.exit               # Error on unrecognized input
 
             # -24(%rbp) does not need to be preserved after this point
             .Lvoyage.warship.fight:
@@ -447,7 +451,7 @@ voyage:
                     jmp 2f
                     
                     1:                      # HMS Pirate Ship sinks
-                        lea fstr20(%rip), %rdi
+                        lea fstr22(%rip), %rdi
                         movq -8(%rbp), %rsi
                         xorq %rax, %rax
                         call printf
@@ -455,7 +459,7 @@ voyage:
                         movq $1, %rax
                         jmp .Lvoyage.exit
                     2:                      # HMS Pirate Ship survives
-                        lea fstr19(%rip), %rdi
+                        lea fstr21(%rip), %rdi
                         movq -8(%rbp), %rsi
                         xorq %rax, %rax
                         call printf
@@ -473,7 +477,7 @@ voyage:
                         jmp .Lvoyage.loop.end
 
                 2:                          # Player wins
-                    lea fstr19(%rip), %rdi
+                    lea fstr20(%rip), %rdi
                     movq -8(%rbp), %rsi
                     xorq %rax, %rax
                     call printf
@@ -481,12 +485,69 @@ voyage:
                     jmp .Lvoyage.loop.end
 
         .Lvoyage.merchantman:
-    
-        .Lvoyage.noincident:
+            # Calculate fight win chance (technically a lie, as damage can also cause a loss)
+            # fight win chance = 1 - 1/((ship_cannons * 0.3) + 1)
+            movsd $0.3, %xmm1
+            cvtsi2sd ship_cannons(%rip), %xmm0
+            mulsd %xmm1, %xmm0
+            addsd $1.0, %xmm0
+            movsd $1.0, %xmm1
+            divsd %xmm0, %xmm1          
+            movsd $1.0, %xmm0
+            subsd %xmm1, %xmm0
+
+            movsd %xmm0, -20(%rsp)          # stores fight win chance in local memory
+
+            # Generates integer between 0 and 9 (inclusive), stores in eax
+            movl $10, %edi
+            call vgrand
+
+            # Stores loot_table[eax] in -12(%rbp), this is how much loot will be rewarded
+            movl loot_table(%rip,%eax,1), -12(%rbp)
+
+            lea str11(%rip) %rdi
+            call vgprint
+
+            movsd -20(%rsp), %xmm0
+            movsd $100.0, %xmm1
+            mulsd %xmm1, %xmm0
+            lea fstr23(%rip), %rdi
+            movq $1, %rax
+            call printf
+
+            lea str12(%rip) %rdi
+            call vgprint
+
+            movq $0, %rax                   # syscall read (0)
+            movq $0, %rdi                   # file descriptor stdin (0)
+            lea -24(%rbp), %rsi             # buffer is a pointer to a local variable
+            movq $1, %rdx                   # read 1 byte
+            syscall
+
+            movb -24(%rbp), %al             # Moves read character into al
+
+            cmpb $121, %al
+            je .Lvoyage.merchantman.attack
+
+            cmpb $110, %al
+            je .Lvoyage.merchantman.end
+
+            movq $2, %rax                   # Error on unrecognized input
+            jmp .Lvoyage.exit
+
+            .Lvoyage.merchantman.attack:
+
+            .Lvoyage.merchantman.end:
+
+
+
+
+
+
 
     .Lvoyage.loop.end:
     jmp .Lvoyage.loop
-
+    
     .Lvoyage.exit:
 
     # Tear down local stack frame
@@ -567,10 +628,15 @@ str9: .ascii "Select one: \0"
 str10: .ascii "DEFEAT: The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
 fstr16: .ascii "PYRRHIC VICTORY: Although you sank the %s, it was able to take you down with it!\n\0"
 fstr17: .ascii "VICTORY: You successfully defeated the %s and took it as your prize!\n\0"
-fstr18: .ascii "VICTORY: The HMS Pirate Ship successfully outran the %s!\n\0"
-fstr19: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship!\n\0"
-fstr20: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship, and sent her to Davy Jones' Locker!\n\0"
+fstr20: .ascii "VICTORY: The HMS Pirate Ship successfully outran the %s!\n\0"
+fstr21: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship!\n\0"
+fstr22: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship, and sent her to Davy Jones' Locker!\n\0"
 
+# Merchantman encounter
+str11: .ascii "You see a merchantman!\n\0"
+fstr23: .ascii "Chance of success if you attack: %.2f%%\n\0"
+str12: .ascii "Do you want to attack? [y/n]: \0"
+loot_table: .long 500, 500, 500, 500, 600, 600, 600, 700, 700, 1000
 .section .data
 
 game_state: .byte 0                         # 0 means game is active, 1 means game not active, 2 means error
