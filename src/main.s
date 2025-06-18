@@ -7,7 +7,11 @@
 .extern vgprint
 .section .text
 
-# void updateMax(void): updates maximums based on level
+/*
+ * void updateMax(void)
+ *
+ * updates maximums based on level
+ */
 .type updateMax, @function
 updateMax:
     # update max limes
@@ -43,7 +47,13 @@ updateMax:
     ret
 .size updateMax, . - updateMax
 
-# int updateStat(int* stat, int delta): returns a copy of the updated stat's value. Stat will be set at zero if adding the delta would make it negative
+/* 
+ * int updateStat(int* stat, int delta)
+ *
+ * returns a copy of the updated stat's value. 
+ * Stat will be set at zero if adding 
+ * the delta would make it negative
+ */
 .type updateStat, @function
 updateStat:
     movl (%rdi), %eax
@@ -56,28 +66,34 @@ updateStat:
     ret
 .size updateStat, . - updateStat
 
-# int updateStatWithMax(int* stat, int* max, int delta): returns a copy of the updated stat's value. Stat will be set at zero if adding the delta would make it negative, and will be set to max if adding delta would make it higher than max
+/* 
+ * int updateStatWithMax(int* stat, int* max, int delta)
+ *
+ * returns a copy of the updated stat's value. Stat will 
+ * be set at zero if adding the delta would make it negative, 
+ * and will be set to max if adding delta would make it higher than max
+ */
 .type updateStatWithMax, @function
-updateStat:
+updateStatWithMax:
     movl (%rdi), %eax
     addl %edx, %eax
     movl (%rsi), %esi                       # Dereference pointer at rsi and store value in esi
 
     cmpl %esi, %eax
-    jg .LupdateStat.overflow                # Jump to overflow case if stat is greater than max
+    jg .LupdateStatWithMax.overflow         # Jump to overflow case if stat is greater than max
 
     cmpl $1, %eax
-    jge .LupdateStat.exit                   # Jumps to exit if result is positive
-    jmp .LupdateStat.underflow              # Otherwise, jump to underflow case
+    jge .LupdateStatWithMax.exit            # Jumps to exit if result is positive
+    jmp .LupdateStatWithMax.underflow       # Otherwise, jump to underflow case
 
-    .LupdateStat.overflow:
+    .LupdateStatWithMax.overflow:
         movl %esi, %eax                     # Sets stat to max if overflow
-        jmp .LupdateStat.exit               
-    .LupdateStat.underflow:
+        jmp .LupdateStatWithMax.exit               
+    .LupdateStatWithMax.underflow:
         xorl %eax, %eax                     # Sets stat to zero if underflow
-        jmp .LupdateStat.exit
+        jmp .LupdateStatWithMax.exit
     
-    .LupdateStat.exit:
+    .LupdateStatWithMax.exit:
     movl %eax, (%rdi)
     ret
 .size updateStatWithMax, . - updateStatWithMax
@@ -86,7 +102,7 @@ updateStat:
 .type voyage, @function
 voyage:
 
-    # Sets up local stack frame
+    /* Sets up local stack frame */
     pushq %rbp
     movq %rsp, %rbp
     subq $64, %rsp                          # Allocates 64 bytes of stack space    
@@ -98,6 +114,12 @@ voyage:
     movl %0, voyage_current_week(%rip)
     movl %3, voyage_resupply_time(%rip)
     .Lvoyage.loop:
+        # TODO: Add resupply check here
+        movl voyage_resupply_time(%rip), %eax
+        test %eax, %eax
+        # Jump to a label or call a function or something here
+
+        # No resupply, continue on from here
         # Prints game data for player
         lea fstr0(%rip), %rdi
         movl voyage_current_week(%rip), %esi
@@ -180,10 +202,14 @@ voyage:
 
         # ebx no longer needs to be preserved after this point
         .Lvoyage.becalmed:
+
             incl voyage_weeks_left(%rip)
+
             incl voyage_resupply_time(%rip)
+
             lea str1(%rip), %rdi
             call vgprint
+
             jmp .Lvoyage.loop.end
         .Lvoyage.storm:
             movl $50, %edi
@@ -225,8 +251,10 @@ voyage:
             1:
                 lea str12(%rip), %rdi
                 call vgprint
+
                 movq $1, %rax               # 1 denotes that the game is over
                 jmp .Lvoyage.exit
+
             2:
                 lea str13(%rip), %rdi
                 call vgprint
@@ -326,7 +354,7 @@ voyage:
             cmpb $50, %al                   
             je .Lvoyage.warship.flee        # checks if user typed '2'
 
-            # -24-20(%rbp) does not need to be preserved after this point
+            # -24(%rbp) does not need to be preserved after this point
             .Lvoyage.warship.fight:
                 call vgrandsd               # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability to win
@@ -370,18 +398,87 @@ voyage:
                         movq -8(%rbp), %rsi
                         xorq %rax, %rax
                         call printf
+
+                        lea fstr10(%rip), %rdi
+                        movl -24(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea fstr11(%rip), %rdi
+                        movl -28(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea fstr18(%rip), %rdi
+                        movl -12(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
+
+                        lea ship_dubloons(%rip), %rdi
+                        movl -12(%rbp), %esi
+                        call updateStat
+                        jmp .Lvoyage.loop.end
+
             .Lvoyage.warship.flee:
+                call vgrandsd               # stores random double between 0 and 1 in xmm0
+                # xmm0 must be LESS THAN the win probability to win
+                movsd $90.0, %xmm1
+                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
+                ja 1f                       
+                jmp 2f
+                1:                          # Warship wins
+                    movl $90, %edi
+                    call vgrand
+                    movl %eax, -24(%rbp)    # Mateys lost
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
 
+                    movl $80, %edi
+                    call vgrand
+                    movl %eax, -28(%rbp)    # Damage taken
+                    movl %eax, %esi
+                    negl %esi
+                    call updateStat         # Update
+                    # Ship health is stored in eax
 
+                    or ship_mateys(%rip), %eax
+                    jz 1f
+                    jmp 2f
+                    
+                    1:                      # HMS Pirate Ship sinks
+                        lea fstr20(%rip), %rdi
+                        movq -8(%rbp), %rsi
+                        xorq %rax, %rax
+                        call printf
 
+                        movq $1, %rax
+                        jmp .Lvoyage.exit
+                    2:                      # HMS Pirate Ship survives
+                        lea fstr19(%rip), %rdi
+                        movq -8(%rbp), %rsi
+                        xorq %rax, %rax
+                        call printf
 
+                        lea fstr10(%rip), %rdi
+                        movl -24(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
 
+                        lea fstr11(%rip), %rdi
+                        movl -28(%rbp), %esi
+                        xorq %rax, %rax
+                        call printf
 
+                        jmp .Lvoyage.loop.end
 
+                2:                          # Player wins
+                    lea fstr19(%rip), %rdi
+                    movq -8(%rbp), %rsi
+                    xorq %rax, %rax
+                    call printf
 
-
-
-
+                    jmp .Lvoyage.loop.end
 
         .Lvoyage.merchantman:
     
@@ -429,9 +526,7 @@ main:
 
 str0: .ascii "You are Captain John Birdman, pirate captain of the HMS Pirate Ship\n\0"
 
-dfstring: .ascii "%lf\0"
-
-# Week messages
+# Weekly messages
 fstr0: .ascii "----------Week %d----------\n\0"
 fstr1: .ascii "Weeks left: %d\n\0"
 fstr2: .ascii "Ship level: %d\n\0"
@@ -443,6 +538,13 @@ fstr7: .ascii "Dubloons: %d\n\0"
 fstr8: .ascii "Cannons: %d/%d\n\0"
 fstr9: .ascii "Weeks until resupply: %d\n\0"
 
+# General messages
+fstr10: .ascii "Mateys killed: %d\n\0"
+fstr11: .ascii "Ship damage: %d\n\0"
+fstr12: .ascii "Booty lost: %d\n\0"
+fstr18: .ascii "Dubloons pillaged: %d\n\0"
+fstr19: .ascii "Booty plundered: %d\n\0"
+
 # Becalmed messages
 str1: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
 
@@ -450,9 +552,6 @@ str1: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
 str2: .ascii "The HMS Pirate Ship was destroyed in a storm!\n\0"
 
 str3: .ascii "The HMS Pirate Ship caught in a storm!\n\0"
-fstr10: .ascii "Mateys killed: %d\n\0"
-fstr11: .ascii "Ship damage: %d\n\0"
-fstr12: .ascii "Booty lost: %d\n\0"
 
 # Warship encounter messages
 str4: .ascii "Man-o-War\n\0"
@@ -468,6 +567,9 @@ str9: .ascii "Select one: \0"
 str10: .ascii "DEFEAT: The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
 fstr16: .ascii "PYRRHIC VICTORY: Although you sank the %s, it was able to take you down with it!\n\0"
 fstr17: .ascii "VICTORY: You successfully defeated the %s and took it as your prize!\n\0"
+fstr18: .ascii "VICTORY: The HMS Pirate Ship successfully outran the %s!\n\0"
+fstr19: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship!\n\0"
+fstr20: .ascii "DEFEAT: The %s caught up to the HMS Pirate Ship, and sent her to Davy Jones' Locker!\n\0"
 
 .section .data
 
