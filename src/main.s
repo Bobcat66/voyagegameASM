@@ -1,10 +1,10 @@
 .extern printf                              # from the C standard library
-.extern vgsrand
-.extern vgrand
-.extern vgrandsd
-.extern vgstrlen
-.extern vgprint
-.section .text
+.extern vgsrand                             # from vglib
+.extern vgrand                              # from vglib
+.extern vgrandsd                            # from vglib
+.extern vgstrlen                            # from vglib
+.extern vgprint                             # from vglib
+.section .text                              # from vglib
 
 /*
  * void updateMax(void)
@@ -97,7 +97,71 @@ updateStatWithMax:
     ret
 .size updateStatWithMax, . - updateStatWithMax
 
-# 
+/*
+ * int purchase(int* stat, int* statmax, int pricePerUnit)
+ */
+.type purchase, @function
+purchase:
+    
+.size purchase, . - purchase
+
+.type resupply, @function
+resupply:
+    pushq %rbp
+    movq %rsp, %rbp
+    subq $64, %rsp                          # Allocates 64 bytes of stack space  
+
+    .Lresupply.loop:
+        movq $0, %rax                       # syscall read (0)
+        movq $0, %rdi                       # file descriptor stdin (0)
+        lea -4(%rbp), %rsi                  # buffer is a pointer to a local variable
+        movq $1, %rdx                       # read 1 byte
+        syscall
+        
+        movb -4(%rbp), %al
+        
+        cmpb $49, %al
+        je .Lresupply.buylimes
+
+        cmpb $50, %al
+        je .Lresupply.recruitmateys
+
+        cmpb $51, %al
+        je .Lresupply.repairship
+
+        cmpb $52, %al
+        je .Lresupply.buycannons
+
+        cmpb $53, %al
+        je .Lresupply.upgradeship
+
+        cmpb $120, %al
+        je .Lresupply.exit
+
+        .Lresupply.buylimes:
+
+        .Lresupply.recruitmateys:
+
+        .Lresupply.repairship:
+
+        .Lresupply.buycannons:
+
+        .Lresupply.upgradeship:
+
+
+    .Lresupply.exit:
+    # Tear down local stack frame
+    movq %rbp, %rsp
+    popq %rbp
+
+    ret
+.size resupply, . - resupply
+
+# -4(%rbp): Mateys lost
+# -8(%rbp): Damage taken
+# -12(%rbp): Booty lost / reward
+# -20(%rsp): win probability (double)
+# -24(%rbp): input buffer (char)
 .type voyage, @function
 voyage:
 
@@ -504,7 +568,7 @@ voyage:
             # Stores loot_table[eax] in -12(%rbp), this is how much loot will be rewarded
             movl loot_table(%rip,%eax,1), -12(%rbp)
 
-            lea str11(%rip) %rdi
+            lea str11(%rip), %rdi
             call vgprint
 
             movsd -20(%rsp), %xmm0
@@ -514,7 +578,7 @@ voyage:
             movq $1, %rax
             call printf
 
-            lea str12(%rip) %rdi
+            lea str12(%rip), %rdi
             call vgprint
 
             movq $0, %rax                   # syscall read (0)
@@ -637,15 +701,11 @@ voyage:
     jmp .Lvoyage.loop
     
     .Lvoyage.exit:
-
     # Tear down local stack frame
     movq %rbp, %rsp
     popq %rbp
 
     ret
-
-
-
 .size voyage, . - voyage
 
 
@@ -675,7 +735,7 @@ main:
 
 str0: .ascii "You are Captain John Birdman, pirate captain of the HMS Pirate Ship\n\0"
 
-# Weekly messages
+# Weekly & supply messages
 fstr0: .ascii "----------Week %d----------\n\0"
 fstr1: .ascii "Weeks left: %d\n\0"
 fstr2: .ascii "Ship level: %d\n\0"
@@ -731,9 +791,6 @@ str13: .ascii "DEFEAT: The merchantman successfully defended against you!\n\0"
 str14: .ascii "DEFEAT: The merchantman sent the HMS Pirate Ship to Dany Jones' Locker!\n\0"
 str15: .ascii "VICTORY: You successfully attacked the merchantman and plundered all its booty!\n\0"
 str16: .ascii "PYRRHIC VICTORY: You successfully attacked the merchantman, but the HMS Pirate Ship took too much damage!\n\0"
-
-
-
 
 loot_table: .long 500, 500, 500, 500, 600, 600, 600, 700, 700, 1000
 
