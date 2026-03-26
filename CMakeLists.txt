@@ -6,4 +6,4 @@ add_library(vglib STATIC
     src/vglib.s
 )
 
-target_link_libraries(voyagegame PRIVATE vglib)
+target_link_libraries(voyagegame PRIVATE vglib c)

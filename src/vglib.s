@@ -1,14 +1,14 @@
 # Macros
-.set A 1103515245
-.set C 12345
+.set A, 1103515245
+.set C, 12345
 
 .section .text
 # void vgsrand(void): seeds rng based on system clock
 .globl vgsrand
 .type vgsrand, @function
 vgsrand:
-    movq $288, %rax                          # syscall clock_gettime
-    movq $0, %rdi                            # CLOCK_REALTIME
+    movq $228, %rax                          # syscall clock_gettime
+    movq $1, %rdi                            # CLOCK_MONOTONIC
     lea seed_buf(%rip), %rsi
     syscall
     ret
@@ -38,38 +38,6 @@ vgrandsd:
     divsd lmaxsd(%rip), %xmm0
     ret
 .size vgrandsd, . - vgrandsd
-
-# long vgstrlen(char*): returns length of string literal
-.globl vgstrlen
-.type vgstrlen, @function
-vgstrlen:
-    xorq %rax, %rax
-    .Lvgrstrlen.loop:
-        movb (%rdi,%rax,1), %sil
-        test %sil, %sil 
-        jz .Lvgrstrlen.end                  # If sil == 0, goto .Lvgrstrlen.end
-        incq %rax
-        jmp .Lvgrstrlen.loop
-    .Lvgrstrlen.end:
-    ret
-.size vgstrlen, . - vgstrlen
-
-# long vgprint(char*): prints a string literal to console
-.globl vgprint
-.type vgprint, @function
-vgprint:
-    push %rdi                               # Store char pointer in stack, as it is volatile
-    call vgstrlen
-    pop %rsi                                # pop char pointer to stack and store in rsi (expected by syscall ABI)                         
-    movq %rax, %rdx                         # move strlen to rdx (expected by syscall ABI)
-    push %rdx                               # store strlen so we can return it
-    movq $1, %rax                           # syscall write (1)
-    movq $1, %rdi                           # file descriptor stdout (1)
-    syscall
-    pop %rax
-    ret
-.size vgprint, . - vgprint
-
 
 .section .rodata
 lmaxsd: .double 4294967295.0

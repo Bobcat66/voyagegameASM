@@ -2,8 +2,6 @@
 .extern vgsrand                             # from vglib
 .extern vgrand                              # from vglib
 .extern vgrandsd                            # from vglib
-.extern vgstrlen                            # from vglib
-.extern vgprint                             # from vglib
 .section .text                              # from vglib
 
 /*
@@ -47,7 +45,7 @@ updateMax:
 .size updateMax, . - updateMax
 
 /* 
- * int updateStat(int* stat, int delta)
+ * int updateStat(int *stat, int delta)
  *
  * returns a copy of the updated stat's value. 
  * Stat will be set at zero if adding 
@@ -66,7 +64,7 @@ updateStat:
 .size updateStat, . - updateStat
 
 /* 
- * int updateStatWithMax(int* stat, int* max, int delta)
+ * int updateStatWithMax(int *stat, int *max, int delta)
  *
  * returns a copy of the updated stat's value. Stat will 
  * be set at zero if adding the delta would make it negative, 
@@ -160,7 +158,7 @@ resupply:
 # -4(%rbp): Mateys lost
 # -8(%rbp): Damage taken
 # -12(%rbp): Booty lost / reward
-# -20(%rsp): win probability (double)
+# -20(%rbp): win probability (double)
 # -24(%rbp): input buffer (char)
 .type voyage, @function
 voyage:
@@ -171,11 +169,12 @@ voyage:
     subq $64, %rsp                          # Allocates 64 bytes of stack space    
 
     lea str0(%rip), %rdi
-    call vgprint
+    xorq %rax, %rax
+    call printf
 
-    movl %18, voyage_weeks_left(%rip)
-    movl %0, voyage_current_week(%rip)
-    movl %3, voyage_resupply_time(%rip)
+    movl $18, voyage_weeks_left(%rip)
+    movl $0, voyage_current_week(%rip)
+    movl $3, voyage_resupply_time(%rip)
     .Lvoyage.loop:
         # TODO: Add resupply check here
         movl voyage_resupply_time(%rip), %eax
@@ -243,22 +242,22 @@ voyage:
         call vgrand
 
         # Compares RNG result and jumps
-        cmpl %0, %eax 
+        cmpl $0, %eax 
         je .Lvoyage.becalmed
 
-        cmpl %1, %eax 
+        cmpl $1, %eax 
         je .Lvoyage.becalmed
 
-        cmpl %2, %eax 
+        cmpl $2, %eax 
         je .Lvoyage.storm
 
-        cmpl %3, %eax 
+        cmpl $3, %eax 
         je .Lvoyage.warship
 
-        cmpl %4, %eax 
+        cmpl $4, %eax 
         je .Lvoyage.merchantman
 
-        cmpl %5, %eax 
+        cmpl $5, %eax 
         je .Lvoyage.merchantman
 
         jmp .Lvoyage.loop.end               # default
@@ -271,7 +270,8 @@ voyage:
             incl voyage_resupply_time(%rip)
 
             lea str1(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             jmp .Lvoyage.loop.end
         .Lvoyage.storm:
@@ -313,14 +313,16 @@ voyage:
             jmp 2f
             1:
                 lea str12(%rip), %rdi
-                call vgprint
+                xorq %rax, %rax
+                call printf
 
                 movq $1, %rax               # 1 denotes that the game is over
                 jmp .Lvoyage.exit
 
             2:
                 lea str13(%rip), %rdi
-                call vgprint
+                xorq %rax, %rax
+                call printf
 
                 lea str14(%rip), %rdi
                 movl -4(%rbp), %esi
@@ -351,14 +353,14 @@ voyage:
                 lea manowarName(%rip), %rdi
                 movq %rdi, -8(%rbp)         # Warship Name: "Man-o-War"
                 movl $30000, -12(%rbp)      # Warship reward: 30000 dubloons
-                movsd $0.02, %xmm1          # Warship win factor: 0.02
+                movsd double_002(%rip), %xmm1          # Warship win factor: 0.02
                 jmp .Lvoyage.warship.event
 
             .Lvoyage.warship.frigate:
-                lea manowarName(%rip), %rdi
+                lea frigateName(%rip), %rdi
                 movq %rdi, -8(%rbp)         # Warship Name: "Frigate"
                 movl $5000, -12(%rbp)       # Warship reward: 5000 dubloons
-                movsd $0.1, %xmm1           # Warship win factor: 0.1
+                movsd double_01(%rip), %xmm1           # Warship win factor: 0.1
                 jmp .Lvoyage.warship.event
 
             .Lvoyage.warship.event:
@@ -366,13 +368,13 @@ voyage:
             # fight win chance = 1 - 1/((ship_cannons * xmm1) + 1)
             cvtsi2sd ship_cannons(%rip), %xmm0
             mulsd %xmm1, %xmm0
-            addsd $1.0, %xmm0
-            movsd $1.0, %xmm1
+            addsd double_01(%rip), %xmm0
+            movsd double_01(%rip), %xmm1
             divsd %xmm0, %xmm1          
-            movsd $1.0, %xmm0
+            movsd double_01(%rip), %xmm0
             subsd %xmm1, %xmm0
 
-            movsd %xmm0, -20(%rsp)          # stores fight win chance in local memory
+            movsd %xmm0, -20(%rbp)          # stores fight win chance in local memory
 
             # Print messages to player
             lea fstr13(%rip), %rdi
@@ -385,24 +387,28 @@ voyage:
             xorq %rax, %rax
             call printf
 
-            movsd -20(%rsp), %xmm0
-            movsd $100.0, %xmm1
+            movsd -20(%rbp), %xmm0
+            movsd double_100(%rip), %xmm1
             mulsd %xmm1, %xmm0
             lea fstr15(%rip), %rdi
-            movq $1, %rax
+            movb $1, %al
             call printf
 
             lea str6(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             lea str7(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             lea str8(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             lea str9(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             movq $0, %rax                   # syscall read (0)
             movq $0, %rdi                   # file descriptor stdin (0)
@@ -425,12 +431,14 @@ voyage:
             .Lvoyage.warship.fight:
                 call vgrandsd               # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability to win
-                ucomisd %xmm0, -20(%rbp)    # compares xmm0 to win chance
+                movsd -20(%rbp), %xmm1
+                ucomisd %xmm0, %xmm1  # compares xmm0 to win chance
                 ja 1f                       
                 jb 2f
                 1:                          # Warship wins
                     lea str10(%rip), %rdi
-                    call print
+                    xorq %rax, %rax
+                    call printf
                     movq $1, %rax
                     jmp .Lvoyage.exit
                 2:                          # Player wins
@@ -439,6 +447,7 @@ voyage:
                     movl %eax, -24(%rbp)    # Mateys lost
                     movl %eax, %esi
                     negl %esi
+                    lea ship_mateys(%rip), %rdi
                     call updateStat         # Update
 
                     movl $30, %edi
@@ -446,6 +455,7 @@ voyage:
                     movl %eax, -28(%rbp)    # Damage taken
                     movl %eax, %esi
                     negl %esi
+                    lea ship_health(%rip), %rdi
                     call updateStat         # Update
                     # Ship health is stored in eax
 
@@ -489,7 +499,7 @@ voyage:
             .Lvoyage.warship.flee:
                 call vgrandsd               # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability to win
-                movsd $90.0, %xmm1
+                movsd double_90(%rip), %xmm1
                 ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
                 ja 1f                       
                 jmp 2f
@@ -499,6 +509,7 @@ voyage:
                     movl %eax, -24(%rbp)    # Mateys lost
                     movl %eax, %esi
                     negl %esi
+                    lea ship_mateys(%rip), %rdi
                     call updateStat         # Update
 
                     movl $80, %edi
@@ -506,6 +517,7 @@ voyage:
                     movl %eax, -28(%rbp)    # Damage taken
                     movl %eax, %esi
                     negl %esi
+                    lea ship_health(%rip), %rdi
                     call updateStat         # Update
                     # Ship health is stored in eax
 
@@ -550,36 +562,41 @@ voyage:
         .Lvoyage.merchantman:
             # Calculate fight win chance (technically a lie, as damage can also cause a loss)
             # fight win chance = 1 - 1/((ship_cannons * 0.3) + 1)
-            movsd $0.3, %xmm1
+            movsd double_03(%rip), %xmm1
             cvtsi2sd ship_cannons(%rip), %xmm0
             mulsd %xmm1, %xmm0
-            addsd $1.0, %xmm0
-            movsd $1.0, %xmm1
+            addsd double_1(%rip), %xmm0
+            movsd double_1(%rip), %xmm1
             divsd %xmm0, %xmm1          
-            movsd $1.0, %xmm0
+            movsd double_1(%rip), %xmm0
             subsd %xmm1, %xmm0
 
-            movsd %xmm0, -20(%rsp)          # stores fight win chance in local memory
+            movsd %xmm0, -20(%rbp)          # stores fight win chance in local memory
 
-            # Generates integer between 0 and 9 (inclusive), stores in eax
+            # Generates integer between 0 and 9 (inclusive), stores in rax
             movl $10, %edi
             call vgrand
 
-            # Stores loot_table[eax] in -12(%rbp), this is how much loot will be rewarded
-            movl loot_table(%rip,%eax,1), -12(%rbp)
+            # Stores loot_table[rax] in -12(%rbp), this is how much loot will be rewarded
+            lea loot_table(%rip), %rcx
+            movl (%rcx,%rax,4), %edx
+            movl %edx, -12(%rbp)
 
             lea str11(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
-            movsd -20(%rsp), %xmm0
-            movsd $100.0, %xmm1
+            movsd -20(%rbp), %xmm0
+            movsd double_100(%rip), %xmm1
             mulsd %xmm1, %xmm0
+            
             lea fstr23(%rip), %rdi
-            movq $1, %rax
+            movb $1, %al
             call printf
 
             lea str12(%rip), %rdi
-            call vgprint
+            xorq %rax, %rax
+            call printf
 
             movq $0, %rax                   # syscall read (0)
             movq $0, %rdi                   # file descriptor stdin (0)
@@ -601,7 +618,8 @@ voyage:
             .Lvoyage.merchantman.attack:
                 call vgrandsd               # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability to win
-                ucomisd %xmm0, -20(%rbp)    # compares xmm0 to win chance
+                movsd -20(%rbp), %xmm1
+                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
                 ja 1f                       
                 jb 2f
                 1:                          # Merchantman wins
@@ -610,6 +628,7 @@ voyage:
                     movl %eax, -24(%rbp)    # Mateys lost
                     movl %eax, %esi
                     negl %esi
+                    lea ship_mateys(%rip), %rdi
                     call updateStat         # Update
 
                     movl $40, %edi
@@ -617,6 +636,7 @@ voyage:
                     movl %eax, -28(%rbp)    # Damage taken
                     movl %eax, %esi
                     negl %esi
+                    lea ship_health(%rip), %rdi
                     call updateStat         # Update
                     # Ship health is stored in eax
 
@@ -626,13 +646,15 @@ voyage:
                     
                     1:                      # HMS Pirate Ship sinks
                         lea str14(%rip), %rdi
-                        call vgprint
+                        xorq %rax, %rax
+                        call printf
 
                         movq $1, %rax
                         jmp .Lvoyage.exit
                     2:                      # HMS Pirate Ship survives
                         lea str13(%rip), %rdi
-                        call vgprint
+                        xorq %rax, %rax
+                        call printf
 
                         lea fstr10(%rip), %rdi
                         movl -24(%rbp), %esi
@@ -652,6 +674,7 @@ voyage:
                     movl %eax, -24(%rbp)    # Mateys lost
                     movl %eax, %esi
                     negl %esi
+                    lea ship_mateys(%rip), %rdi
                     call updateStat         # Update
 
                     movl $10, %edi
@@ -659,6 +682,7 @@ voyage:
                     movl %eax, -28(%rbp)    # Damage taken
                     movl %eax, %esi
                     negl %esi
+                    lea ship_health(%rip), %rdi
                     call updateStat         # Update
                     # Ship health is stored in eax
 
@@ -668,7 +692,8 @@ voyage:
 
                     1:                      # Pyrrhic victory
                         lea str16(%rip), %rdi
-                        call vgprint
+                        xorq %rax, %rax
+                        call printf
 
                         movq $1, %rax
                         jmp .Lvoyage.exit
@@ -713,6 +738,7 @@ voyage:
 .globl main
 .type main, @function
 main:
+    sub $8, %rsp                            # Align stack pointer on 16 bytes, as the code begins misaligned because the CRT's call to main pushes a return pointer to the stack
     call vgsrand                            # Seed RNG
     .Lmain.loop:
         # Begin game
@@ -727,7 +753,8 @@ main:
         call voyage
         
     .Lmain.exit:
-    mov $0 %rax                             # return 0
+    add $8, %rsp                             # return stack pointer back to where it was originally so we can return properly
+    mov $0, %rax                             # return 0
     ret
 .size main, . - main
 
@@ -794,6 +821,17 @@ str16: .ascii "PYRRHIC VICTORY: You successfully attacked the merchantman, but t
 
 loot_table: .long 500, 500, 500, 500, 600, 600, 600, 700, 700, 1000
 
+# Ship names
+manowarName: .ascii "Man-o-War\0"
+frigateName: .ascii "Frigate\0"
+
+# Miscellaneous floating point values
+double_002: .double 0.02
+double_01:  .double 0.1
+double_03:  .double 0.3
+double_1:   .double 1.0
+double_90:  .double 90.0
+double_100: .double 100.0
 
 .section .data
 
