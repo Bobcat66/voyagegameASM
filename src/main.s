@@ -406,13 +406,7 @@ voyage:
             xorq %rax, %rax
             call printf
 
-            movq $0, %rax                   # syscall read (0)
-            movq $0, %rdi                   # file descriptor stdin (0)
-            lea -24(%rbp), %rsi             # buffer is a pointer to a local variable
-            movq $1, %rdx                   # read 1 byte
-            syscall
-
-            movb -24(%rbp), %al             # moves byte into al
+            call getchar
 
             cmpb $49, %al
             je .Lvoyage.warship.fight       # checks if user typed '1'
@@ -594,13 +588,7 @@ voyage:
             xorq %rax, %rax
             call printf
 
-            movq $0, %rax                   # syscall read (0)
-            movq $0, %rdi                   # file descriptor stdin (0)
-            lea -24(%rbp), %rsi             # buffer is a pointer to a local variable
-            movq $1, %rdx                   # read 1 byte
-            syscall
-
-            movb -24(%rbp), %al             # Moves read character into al
+            call getchar
 
             cmpb $121, %al
             je .Lvoyage.merchantman.attack
