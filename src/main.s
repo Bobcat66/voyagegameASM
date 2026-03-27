@@ -213,15 +213,15 @@ resupply:
         je .Lresupply.exit
 
         .Lresupply.buylimes:
-            movq ship_limes(%rip), %rdi
-            movq ship_max_limes(%rip), %rsi
+            lea ship_limes(%rip), %rdi
+            lea ship_max_limes(%rip), %rsi
             movl $1, %edx
             call purchase
             jmp .Lresupply.loop
 
         .Lresupply.recruitmateys:
-            movq ship_mateys(%rip), %rdi
-            movq ship_max_mateys(%rip), %rsi
+            lea ship_mateys(%rip), %rdi
+            lea ship_max_mateys(%rip), %rsi
             movl $6, %edx
             call purchase
             jmp .Lresupply.loop
@@ -229,14 +229,18 @@ resupply:
         .Lresupply.repairship:
             movl ship_max_health(%rip), %eax
             subl ship_health(%rip), %eax
+            movl %eax, -4(%rbp)     # Stores total repairs in local memory
             imull $3, %eax
-            movl %eax, -4(%rbp)     # Stores repair cost in local memory
+            movl %eax, -8(%rbp)     # Stores repair cost in local memory
+            cmpl ship_dubloons(%rip), %eax
+            jl .Lresupply.tooExpensiveRepair # Jump to case if player can't afford repairs
+
             lea repairPrompt(%rip), %rdi
             movl %eax, %esi
             xorq %rax, %rax
             call printf
 
-            movq char_buf(%rip), %rdi
+            lea char_buf(%rip), %rdi
             movl $128, %esi
             call fgets_stdin
 
@@ -248,15 +252,28 @@ resupply:
             je .Lresupply.loop
 
             .Lresupply.repairConfirmed:
-                
-
+                lea ship_dubloons(%rip), %rdi
+                movl -8(%rbp), %esi
+                negl %esi
+                call updateStat
+                lea ship_health(%rip), %rdi
+                movl -4(%rbp), %esi
+                call updateStat
+                jmp .Lresupply.loop
+            
+            .Lresupply.tooExpensiveRepair:
+                lea notEnoughDubloonsRepairStr(%rip), %rdi
+                xorq %rax, %rax
+                call printf
                 jmp .Lresupply.loop
 
-
-
-
         .Lresupply.buycannons:
-
+            lea ship_cannons(%rip), %rdi
+            lea ship_max_cannons(%rip), %rsi
+            movl $20, %edx
+            call purchase
+            jmp .Lresupply.loop
+            
         .Lresupply.upgradeship:
 
 
