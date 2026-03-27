@@ -1,7 +1,7 @@
 .extern printf                              # from the C standard library
-.extern getchar                             # from the C standard library
-.extern randint                             # from randlib
-.extern randfp                              # from randlib
+.extern fgets_stdin                         # from vglib
+.extern randint                             # from vglib
+.extern randfp                              # from vglib
 .section .text                     
 
 /*
@@ -111,7 +111,10 @@ resupply:
 
     .Lresupply.loop:
         
-        call getchar
+        lea char_buf(%rip), %rdi
+        movl $128, %esi
+        call fgets_stdin
+        movb char_buf(%rip), %al            # Fuck it we ball
         
         cmpb $49, %al
         je .Lresupply.buylimes
@@ -364,10 +367,10 @@ voyage:
             # fight win chance = 1 - 1/((ship_cannons * xmm1) + 1)
             cvtsi2sd ship_cannons(%rip), %xmm0
             mulsd %xmm1, %xmm0
-            addsd double_01(%rip), %xmm0
-            movsd double_01(%rip), %xmm1
+            addsd double_1(%rip), %xmm0
+            movsd double_1(%rip), %xmm1
             divsd %xmm0, %xmm1          
-            movsd double_01(%rip), %xmm0
+            movsd double_1(%rip), %xmm0
             subsd %xmm1, %xmm0
 
             movsd %xmm0, -20(%rbp)          # stores fight win chance in local memory
@@ -406,7 +409,10 @@ voyage:
             xorq %rax, %rax
             call printf
 
-            call getchar
+            lea char_buf(%rip), %rdi
+            movl $128, %esi
+            call fgets_stdin
+            movb char_buf(%rip), %al        # Fuck it we ball
 
             cmpb $49, %al
             je .Lvoyage.warship.fight       # checks if user typed '1'
@@ -417,14 +423,13 @@ voyage:
             movq $2, %rax                 
             jmp .Lvoyage.exit               # Error on unrecognized input
 
-            # -24(%rbp) does not need to be preserved after this point
             .Lvoyage.warship.fight:
                 call randfp               # stores random double between 0 and 1 in xmm0
-                # xmm0 must be LESS THAN the win probability to win
+                # xmm0 must be LESS THAN the win probability for the player to win
                 movsd -20(%rbp), %xmm1
-                ucomisd %xmm0, %xmm1  # compares xmm0 to win chance
-                ja 1f                       
-                jb 2f
+                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
+                jb 1f                       # win chance is less than xmm0                 
+                ja 2f                       # win chance is greater than xmm0
                 1:                          # Warship wins
                     lea fightDefeatStr(%rip), %rdi
                     xorq %rax, %rax
@@ -489,10 +494,10 @@ voyage:
             .Lvoyage.warship.flee:
                 call randfp               # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability to win
-                movsd double_90(%rip), %xmm1
+                movsd double_09(%rip), %xmm1
                 ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
-                ja 1f                       
-                jmp 2f
+                jb 1f                       # win chance is lower than xmm0        
+                ja 2f                       # win chance is higher than xmm0
                 1:                          # Warship wins
                     movl $90, %edi
                     call randint
@@ -588,7 +593,10 @@ voyage:
             xorq %rax, %rax
             call printf
 
-            call getchar
+            lea char_buf(%rip), %rdi
+            movl $128, %esi
+            call fgets_stdin
+            movb char_buf(%rip), %al            # Fuck it we ball
 
             cmpb $121, %al
             je .Lvoyage.merchantman.attack
@@ -601,11 +609,11 @@ voyage:
 
             .Lvoyage.merchantman.attack:
                 call randfp               # stores random double between 0 and 1 in xmm0
-                # xmm0 must be LESS THAN the win probability to win
+                # xmm0 must be LESS THAN the win probability for player to win
                 movsd -20(%rbp), %xmm1
                 ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
-                ja 1f                       
-                jb 2f
+                jb 1f                       # win chance is lower than xmm0                   
+                ja 2f                       # win chance is higher than xmm0
                 1:                          # Merchantman wins
                     movl $40, %edi
                     call randint
@@ -726,8 +734,10 @@ voyage:
     xorq %rax, %rax
     call printf
 
-    call getchar
-    movl %eax, -24(%rbp)
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+    movb char_buf(%rip), %al                # Fuck it we ball
 
     jmp .Lvoyage.loop
     
@@ -834,7 +844,7 @@ double_002: .double 0.02
 double_01:  .double 0.1
 double_03:  .double 0.3
 double_1:   .double 1.0
-double_90:  .double 90.0
+double_09:  .double 0.9
 double_100: .double 100.0
 
 # Input strings
@@ -864,6 +874,8 @@ return_voyage: .byte 1                      # whether or not the game is on a re
 .lcomm ship_max_booty, 4
 .lcomm ship_max_cannons, 4
 .lcomm ship_max_health, 4
+
+.lcomm char_buf, 128
 
 
 
