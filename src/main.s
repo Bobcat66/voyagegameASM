@@ -212,6 +212,7 @@ voyage:
 
         lea bootyWeeklyStr(%rip), %rdi
         movl ship_booty(%rip), %esi
+        movl ship_max_booty(%rip), %edx
         xorq %rax, %rax
         call printf
 
