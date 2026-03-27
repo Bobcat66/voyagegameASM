@@ -723,6 +723,31 @@ voyage:
                         jmp .Lvoyage.loop.end
 
     .Lvoyage.loop.end:
+
+    lea voyage_weeks_left(%rip), %rdi       # Update voyage weeks left
+    movl $-1, %esi
+    call updateStat
+
+    incl voyage_current_week(%rip)          # Update voyage current week
+
+    lea voyage_resupply_time(%rip), %rdi    # Update resupply time
+    movl $-1, %esi
+    call updateStat
+
+    lea ship_limes(%rip), %rdi              # Update limes
+    movl $-10, %esi
+    call updateStat
+
+    lea str17(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    movq $0, %rax                   # syscall read (0)
+    movq $0, %rdi                   # file descriptor stdin (0)
+    lea -24(%rbp), %rsi             # buffer is a pointer to a local variable.
+    movq $1, %rdx                   # read 1 byte. We don't actually care what it is, and it is effectively discarded
+    syscall
+
     jmp .Lvoyage.loop
     
     .Lvoyage.exit:
@@ -780,6 +805,7 @@ fstr11: .ascii "Ship damage: %d\n\0"
 fstr12: .ascii "Booty lost: %d\n\0"
 fstr18: .ascii "Dubloons pillaged: %d\n\0"
 fstr19: .ascii "Booty plundered: %d\n\0"
+str17: .ascii "Press [Enter] to continue.\n\0"
 
 # Becalmed messages
 str1: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
@@ -813,7 +839,7 @@ str11: .ascii "You see a merchantman!\n\0"
 
 fstr23: .ascii "Chance of success if you attack: %.2f%%\n\0"
 
-str12: .ascii "Do you want to attack? [y/n]: \0"
+str12: .ascii "Do you want to attack? [y/n]:\n\0"
 str13: .ascii "DEFEAT: The merchantman successfully defended against you!\n\0"
 str14: .ascii "DEFEAT: The merchantman sent the HMS Pirate Ship to Dany Jones' Locker!\n\0"
 str15: .ascii "VICTORY: You successfully attacked the merchantman and plundered all its booty!\n\0"
