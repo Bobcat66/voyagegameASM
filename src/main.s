@@ -2,6 +2,7 @@
 .extern fgets_stdin                         # from vglib
 .extern randint                             # from vglib
 .extern randfp                              # from vglib
+.extern srand_vg                            # from vglib
 .section .text                     
 
 /*
@@ -311,7 +312,7 @@ voyage:
             jz 1f
             jmp 2f
             1:
-                lea merchantmanAttackPrompt(%rip), %rdi
+                lea destroyedStormMessage(%rip), %rdi
                 xorq %rax, %rax
                 call printf
 
@@ -319,27 +320,26 @@ voyage:
                 jmp .Lvoyage.exit
 
             2:
-                lea defeatMerchantmanStr(%rip), %rdi
+                lea caughtStormMessage(%rip), %rdi
                 xorq %rax, %rax
                 call printf
 
-                lea majorDefeatMerchantmanStr(%rip), %rdi
+                lea mateysKilledStr(%rip), %rdi
                 movl -4(%rbp), %esi
                 xorq %rax, %rax
                 call printf
 
-                lea victoryMerchantmanStr(%rip), %rdi
+                lea shipDamageStr(%rip), %rdi
                 movl -8(%rbp), %esi
                 xorq %rax, %rax
                 call printf
 
-                lea pyrrhicVictoryMerchantmanStr(%rip), %rdi
+                lea bootyLostStr(%rip), %rdi
                 movl -12(%rbp), %esi
                 xorq %rax, %rax
                 call printf
 
                 jmp .Lvoyage.loop.end
-
 
         .Lvoyage.warship:
             movl $2, %edi
@@ -517,10 +517,10 @@ voyage:
                     # Ship health is stored in eax
 
                     or ship_mateys(%rip), %eax
-                    jz 1f
-                    jmp 2f
+                    jz 3f
+                    jmp 4f
                     
-                    1:                      # HMS Pirate Ship sinks
+                    3:                      # HMS Pirate Ship sinks
                         lea fleeMajorDefeatStr(%rip), %rdi
                         movq -8(%rbp), %rsi
                         xorq %rax, %rax
@@ -528,7 +528,7 @@ voyage:
 
                         movq $1, %rax
                         jmp .Lvoyage.exit
-                    2:                      # HMS Pirate Ship survives
+                    4:                      # HMS Pirate Ship survives
                         lea fleeDefeatStr(%rip), %rdi
                         movq -8(%rbp), %rsi
                         xorq %rax, %rax
@@ -608,7 +608,7 @@ voyage:
             jmp .Lvoyage.exit
 
             .Lvoyage.merchantman.attack:
-                call randfp               # stores random double between 0 and 1 in xmm0
+                call randfp                 # stores random double between 0 and 1 in xmm0
                 # xmm0 must be LESS THAN the win probability for player to win
                 movsd -20(%rbp), %xmm1
                 ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
@@ -633,17 +633,17 @@ voyage:
                     # Ship health is stored in eax
 
                     or ship_mateys(%rip), %eax
-                    jz 1f
-                    jmp 2f
+                    jz 3f
+                    jmp 4f
                     
-                    1:                      # HMS Pirate Ship sinks
+                    3:                      # HMS Pirate Ship sinks
                         lea majorDefeatMerchantmanStr(%rip), %rdi
                         xorq %rax, %rax
                         call printf
 
                         movq $1, %rax
                         jmp .Lvoyage.exit
-                    2:                      # HMS Pirate Ship survives
+                    4:                      # HMS Pirate Ship survives
                         lea defeatMerchantmanStr(%rip), %rdi
                         xorq %rax, %rax
                         call printf
@@ -679,17 +679,17 @@ voyage:
                     # Ship health is stored in eax
 
                     or ship_mateys(%rip), %eax
-                    jz 1f                   # If either mateys or health are 0, jump to pyrrhic victory
-                    jmp 2f                  # Otherwise, jump to victory
+                    jz 3f                   # If either mateys or health are 0, jump to pyrrhic victory
+                    jmp 4f                  # Otherwise, jump to victory
 
-                    1:                      # Pyrrhic victory
+                    3:                      # Pyrrhic victory
                         lea pyrrhicVictoryMerchantmanStr(%rip), %rdi
                         xorq %rax, %rax
                         call printf
 
                         movq $1, %rax
                         jmp .Lvoyage.exit
-                    2:                      # Victory
+                    4:                      # Victory
                         lea victoryMerchantmanStr(%rip), %rdi
                         call printf
 
@@ -755,6 +755,7 @@ voyage:
 .type main, @function
 main:
     sub $8, %rsp                            # Align stack pointer on 16 bytes, as the code begins misaligned because the CRT's call to main pushes a return pointer to the stack
+    call srand_vg
     .Lmain.loop:
         # Begin game
         movl $300, ship_limes(%rip)
