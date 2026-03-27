@@ -1,4 +1,5 @@
 .extern printf                              # from the C standard library
+.extern atoi                                # from the C standard library
 .extern fgets_stdin                         # from vglib
 .extern randint                             # from vglib
 .extern randfp                              # from vglib
@@ -101,7 +102,83 @@ updateStatWithMax:
  */
 .type purchase, @function
 purchase:
+    pushq %rbp
+    movq %rsp, %rbp
+    subq $64, %rsp                          # Allocates 64 bytes of stack space
+
+    movq %rdi, -8(%rbp)                     # Stores pointer to stat in local memory
+    movq %rsi, -16(%rbp)                    # Stores pointer to statmax in local memory
+    movl %edx, -20(%rbp)                    # Stores pricePerUnit in local memory
+
+    # Print purchase prompt and get user input
+    lea purchasePrompt(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+
+    # Calculate the actual quantity that is being purchased
+    lea char_buf(%rip), %rdi
+    call atoi
+    movl %eax, %edi
+    movq -8(%rbp), %r10
+    addl (%r10), %edi                   # Calculate quantity after purchase
+    movq -16(%rbp), %r11
+    cmp %edi, (%r11)                    # Compare quantity to stat max
+    jb .Lpurchase.aboveMax              # Jump to error case if quantity is greater than stat max
+    # edi no longer needs to be preserved after this point
+    movl %eax, %edi
+    imull -20(%rbp), %edi               # Calculate total price of purchase
+
+    cmp %edi, ship_dubloons(%rip)       # Compare price to player's dubloons
+    jb .Lpurchase.tooExpensive          # Jump to error case if price is greater than player's dubloons
+
+    movl %eax, -24(%rbp)                # Stores quantity being purchased in local memory
+    movl %edi, -28(%rbp)                # Stores total price of purchase in local memory
     
+    lea confirmPurchaseStr(%rip), %rdi
+    movl -24(%rbp), %esi
+    movl -28(%rbp), %edx
+    xorq %rax, %rax
+    call printf
+
+    movl char_buf(%rip), %al
+    cmpb $121, %al                    # Checks if user input is 'y'
+    je .Lpurchase.confirmed
+    cmpb $110, %al                    # Checks if user input is 'n'
+    je .Lpurchase.exit
+
+    .Lpurchase.confimed:
+        movq -8(%rbp), %rdi
+        movl -24(%rbp), %esi
+        call updateStat
+
+        movq ship_dubloons(%rip), %rdi
+        movl -28(%rbp), %esi
+        negl %esi
+        call updateStat
+        jmp .Lpurchase.exit
+
+    .Lpurchase.tooExpensive
+        lea tooExpensivePurchaseStr(%rip), %rdi
+        xorq %rax, %rax
+        call printf
+        jmp .Lpurchase.exit
+
+    .Lpurchase.aboveMax
+        lea aboveMaxPurchaseStr(%rip), %rdi
+        xorq %rax, %rax
+        call printf
+        jmp .Lpurchase.exit
+
+    .Lpurchase.exit:
+    # Tear down local stack frame
+    movq %rbp, %rsp
+    popq %rbp
+
+    ret
 .size purchase, . - purchase
 
 .type resupply, @function
@@ -136,11 +213,47 @@ resupply:
         je .Lresupply.exit
 
         .Lresupply.buylimes:
-
+            movq ship_limes(%rip), %rdi
+            movq ship_max_limes(%rip), %rsi
+            movl $1, %edx
+            call purchase
+            jmp .Lresupply.loop
 
         .Lresupply.recruitmateys:
+            movq ship_mateys(%rip), %rdi
+            movq ship_max_mateys(%rip), %rsi
+            movl $6, %edx
+            call purchase
+            jmp .Lresupply.loop
 
         .Lresupply.repairship:
+            movl ship_max_health(%rip), %eax
+            subl ship_health(%rip), %eax
+            imull $3, %eax
+            movl %eax, -4(%rbp)     # Stores repair cost in local memory
+            lea repairPrompt(%rip), %rdi
+            movl %eax, %esi
+            xorq %rax, %rax
+            call printf
+
+            movq char_buf(%rip), %rdi
+            movl $128, %esi
+            call fgets_stdin
+
+            movb char_buf(%rip), %al
+            cmpb $121, %al                    # Checks if user input is 'y'
+            je .Lresupply.repairConfirmed
+
+            cmpb $110, %al                    # Checks if user input is 'n'
+            je .Lresupply.loop
+
+            .Lresupply.repairConfirmed:
+                
+
+                jmp .Lresupply.loop
+
+
+
 
         .Lresupply.buycannons:
 
@@ -800,6 +913,17 @@ bootyPlunderedStr: .ascii "Booty plundered: %d\n\0"
 anyKeyPrompt: .ascii "Press any key to continue.\n\0"
 newline: .ascii "\n\0"
 resupplyPrompt: .ascii "1: Buy limes\n2: Hire mateys\n3: Repair ship\n4: Buy cannons\n5: Upgrade Ship\nx: Exit\n\0"
+
+# Purchase strings
+purchasePrompt: .ascii "How much would you like to purchase? (Enter a number)\n\0"
+aboveMaxPurchaseStr: .ascii "You cannot purchase that much, it would put you above your max capacity!\n\0"
+tooExpensivePurchaseStr: .ascii "You cannot purchase that much, you don't have enough dubloons!\n\0"
+confirmPurchaseStr: .ascii "Confirm purchase of %d units for %d dubloons? [y/n]\n\0"
+
+# Repair strings
+repairPrompt: .ascii "Cost to repair ship: %d dubloons. Confirm repair? [y/n]\n\0"
+notEnoughDubloonsRepairStr: .ascii "You cannot repair your ship, you don't have enough dubloons!\n\0"
+repairConfirmStr: .ascii "Your ship has been repaired by %d health points!\n\0"
 
 # Becalmed messages
 becalmedMessage: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
