@@ -13,33 +13,28 @@
  */
 .type updateMax, @function
 updateMax:
-    # update max limes
-    movl ship_level(%rip), %eax
+    movl ship_level(%rip), %eax             # update max limes
     imull $50, %eax, %eax
     addl $250, %eax
     movl %eax, ship_max_limes(%rip)
 
-    # update max limes
-    movl ship_level(%rip), %eax
-    imul $15, %eax, %eax
+    movl ship_level(%rip), %eax             # update max mateys
+    imull $15, %eax, %eax
     addl $165, %eax
     movl %eax, ship_max_mateys(%rip)
 
-    # update max booty
-    movl ship_level(%rip), %eax
-    imul $500, %eax, %eax
+    movl ship_level(%rip), %eax             # update max booty
+    imull $500, %eax, %eax
     addl $2500, %eax
     movl %eax, ship_max_booty(%rip)
 
-    # update max cannons
-    movl ship_level(%rip), %eax
-    imul $5, %eax, %eax
+    movl ship_level(%rip), %eax             # update max cannons
+    imull $5, %eax, %eax
     addl $18, %eax
     movl %eax, ship_max_cannons(%rip)
 
-    # update max health
-    movl ship_level(%rip), %eax
-    imul $30, %eax, %eax
+    movl ship_level(%rip), %eax             # update max health
+    imull $30, %eax, %eax
     addl $70, %eax
     movl %eax, ship_max_health(%rip)
 
@@ -70,11 +65,11 @@ updateStat:
  *
  * returns a copy of the updated stat's value. Stat will 
  * be set at zero if adding the delta would make it negative, 
- * and will be set to max if adding delta would make it higher than max
+ * and will be set to max if adding delta would make it higher than max. Maybe not necessary?
  */
 .type updateStatWithMax, @function
 updateStatWithMax:
-    movl (%rdi), %eax
+    movl (%rdi), %eax                       # Dereference pointer at rdi and store value in eax
     addl %edx, %eax
     movl (%rsi), %esi                       # Dereference pointer at rsi and store value in esi
 
@@ -85,14 +80,15 @@ updateStatWithMax:
     jge .LupdateStatWithMax.exit            # Jumps to exit if result is positive
     jmp .LupdateStatWithMax.underflow       # Otherwise, jump to underflow case
 
-    .LupdateStatWithMax.overflow:
-        movl %esi, %eax                     # Sets stat to max if overflow
-        jmp .LupdateStatWithMax.exit               
-    .LupdateStatWithMax.underflow:
-        xorl %eax, %eax                     # Sets stat to zero if underflow
-        jmp .LupdateStatWithMax.exit
-    
-    .LupdateStatWithMax.exit:
+.LupdateStatWithMax.overflow:
+    movl %esi, %eax                         # Sets stat to max if overflow
+    jmp .LupdateStatWithMax.exit  
+
+.LupdateStatWithMax.underflow:
+    xorl %eax, %eax                         # Sets stat to zero if underflow
+    jmp .LupdateStatWithMax.exit
+
+.LupdateStatWithMax.exit:
     movl %eax, (%rdi)
     ret
 .size updateStatWithMax, . - updateStatWithMax
@@ -110,8 +106,7 @@ purchase:
     movq %rsi, -16(%rbp)                    # Stores pointer to statmax in local memory
     movl %edx, -20(%rbp)                    # Stores pricePerUnit in local memory
 
-    # Print purchase prompt and get user input
-    lea purchasePrompt(%rip), %rdi
+    lea purchasePrompt(%rip), %rdi          # Print purchase prompt and get user input
     xorq %rax, %rax
     call printf
 
@@ -119,24 +114,23 @@ purchase:
     movl $128, %esi
     call fgets_stdin
 
-    # Calculate the actual quantity that is being purchased
-    lea char_buf(%rip), %rdi
+    lea char_buf(%rip), %rdi                # Calculate the actual quantity that is being purchased
     call atoi
     movl %eax, %edi
     movq -8(%rbp), %r10
-    addl (%r10), %edi                   # Calculate quantity after purchase
+    addl (%r10), %edi                       # Calculate quantity after purchase
     movq -16(%rbp), %r11
-    cmp %edi, (%r11)                    # Compare quantity to stat max
-    jb .Lpurchase.aboveMax              # Jump to error case if quantity is greater than stat max
-    # edi no longer needs to be preserved after this point
-    movl %eax, %edi
-    imull -20(%rbp), %edi               # Calculate total price of purchase
+    cmp %edi, (%r11)                        # Compare quantity to stat max
+    jb .Lpurchase.aboveMax                  # Jump to error case if quantity is greater than stat max
 
-    cmp %edi, ship_dubloons(%rip)       # Compare price to player's dubloons
-    jb .Lpurchase.tooExpensive          # Jump to error case if price is greater than player's dubloons
+    movl %eax, %edi                         # edi no longer needs to be preserved after this point
+    imull -20(%rbp), %edi                   # Calculate total price of purchase
 
-    movl %eax, -24(%rbp)                # Stores quantity being purchased in local memory
-    movl %edi, -28(%rbp)                # Stores total price of purchase in local memory
+    cmp %edi, ship_dubloons(%rip)           # Compare price to player's dubloons
+    jb .Lpurchase.tooExpensive              # Jump to error case if price is greater than player's dubloons
+
+    movl %eax, -24(%rbp)                    # Stores quantity being purchased in local memory
+    movl %edi, -28(%rbp)                    # Stores total price of purchase in local memory
     
     lea confirmPurchaseStr(%rip), %rdi
     movl -24(%rbp), %esi
@@ -144,36 +138,40 @@ purchase:
     xorq %rax, %rax
     call printf
 
-    movl char_buf(%rip), %al
-    cmpb $121, %al                    # Checks if user input is 'y'
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+
+    movb char_buf(%rip), %al                # Fuck it we ball
+    cmpb $121, %al                          # Checks if user input is 'y'
     je .Lpurchase.confirmed
-    cmpb $110, %al                    # Checks if user input is 'n'
+    cmpb $110, %al                          # Checks if user input is 'n'
     je .Lpurchase.exit
 
-    .Lpurchase.confimed:
-        movq -8(%rbp), %rdi
-        movl -24(%rbp), %esi
-        call updateStat
+.Lpurchase.confirmed:
+    movq -8(%rbp), %rdi
+    movl -24(%rbp), %esi
+    call updateStat
 
-        movq ship_dubloons(%rip), %rdi
-        movl -28(%rbp), %esi
-        negl %esi
-        call updateStat
-        jmp .Lpurchase.exit
+    lea ship_dubloons(%rip), %rdi
+    movl -28(%rbp), %esi
+    negl %esi
+    call updateStat
+    jmp .Lpurchase.exit
 
-    .Lpurchase.tooExpensive
-        lea tooExpensivePurchaseStr(%rip), %rdi
-        xorq %rax, %rax
-        call printf
-        jmp .Lpurchase.exit
+.Lpurchase.tooExpensive:
+    lea tooExpensivePurchaseStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    jmp .Lpurchase.exit
 
-    .Lpurchase.aboveMax
-        lea aboveMaxPurchaseStr(%rip), %rdi
-        xorq %rax, %rax
-        call printf
-        jmp .Lpurchase.exit
+.Lpurchase.aboveMax:
+    lea aboveMaxPurchaseStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    jmp .Lpurchase.exit
 
-    .Lpurchase.exit:
+.Lpurchase.exit:
     # Tear down local stack frame
     movq %rbp, %rsp
     popq %rbp
@@ -187,97 +185,152 @@ resupply:
     movq %rsp, %rbp
     subq $64, %rsp                          # Allocates 64 bytes of stack space  
 
-    .Lresupply.loop:
-        
-        lea char_buf(%rip), %rdi
-        movl $128, %esi
-        call fgets_stdin
-        movb char_buf(%rip), %al            # Fuck it we ball
-        
-        cmpb $49, %al
-        je .Lresupply.buylimes
+.Lresupply.loop:
 
-        cmpb $50, %al
-        je .Lresupply.recruitmateys
+    lea resupplyPrompt(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+    movb char_buf(%rip), %al                # Fuck it we ball
+    
+    cmpb $49, %al
+    je .Lresupply.buylimes
 
-        cmpb $51, %al
-        je .Lresupply.repairship
+    cmpb $50, %al
+    je .Lresupply.recruitmateys
 
-        cmpb $52, %al
-        je .Lresupply.buycannons
+    cmpb $51, %al
+    je .Lresupply.repairship
 
-        cmpb $53, %al
-        je .Lresupply.upgradeship
+    cmpb $52, %al
+    je .Lresupply.buycannons
 
-        cmpb $120, %al
-        je .Lresupply.exit
+    cmpb $53, %al
+    je .Lresupply.upgradeship
 
-        .Lresupply.buylimes:
-            lea ship_limes(%rip), %rdi
-            lea ship_max_limes(%rip), %rsi
-            movl $1, %edx
-            call purchase
-            jmp .Lresupply.loop
+    cmpb $120, %al
+    je .Lresupply.exit
 
-        .Lresupply.recruitmateys:
-            lea ship_mateys(%rip), %rdi
-            lea ship_max_mateys(%rip), %rsi
-            movl $6, %edx
-            call purchase
-            jmp .Lresupply.loop
+.Lresupply.buylimes:
+    lea ship_limes(%rip), %rdi
+    lea ship_max_limes(%rip), %rsi
+    movl $1, %edx
+    call purchase
+    jmp .Lresupply.loop
 
-        .Lresupply.repairship:
-            movl ship_max_health(%rip), %eax
-            subl ship_health(%rip), %eax
-            movl %eax, -4(%rbp)     # Stores total repairs in local memory
-            imull $3, %eax
-            movl %eax, -8(%rbp)     # Stores repair cost in local memory
-            cmpl ship_dubloons(%rip), %eax
-            jl .Lresupply.tooExpensiveRepair # Jump to case if player can't afford repairs
+.Lresupply.recruitmateys:
+    lea ship_mateys(%rip), %rdi
+    lea ship_max_mateys(%rip), %rsi
+    movl $6, %edx
+    call purchase
+    jmp .Lresupply.loop
 
-            lea repairPrompt(%rip), %rdi
-            movl %eax, %esi
-            xorq %rax, %rax
-            call printf
+.Lresupply.repairship:
+    movl ship_max_health(%rip), %eax
+    subl ship_health(%rip), %eax
+    movl %eax, -4(%rbp)                     # Stores total repairs in local memory
+    imull $3, %eax
+    movl %eax, -8(%rbp)                     # Stores repair cost in local memory
 
-            lea char_buf(%rip), %rdi
-            movl $128, %esi
-            call fgets_stdin
+    lea repairPrompt(%rip), %rdi
+    movl %eax, %esi
+    xorq %rax, %rax
+    call printf
 
-            movb char_buf(%rip), %al
-            cmpb $121, %al                    # Checks if user input is 'y'
-            je .Lresupply.repairConfirmed
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
 
-            cmpb $110, %al                    # Checks if user input is 'n'
-            je .Lresupply.loop
+    movb char_buf(%rip), %al
+    cmpb $121, %al                          # Checks if user input is 'y'
+    je .Lresupply.repairConfirmed
 
-            .Lresupply.repairConfirmed:
-                lea ship_dubloons(%rip), %rdi
-                movl -8(%rbp), %esi
-                negl %esi
-                call updateStat
-                lea ship_health(%rip), %rdi
-                movl -4(%rbp), %esi
-                call updateStat
-                jmp .Lresupply.loop
-            
-            .Lresupply.tooExpensiveRepair:
-                lea notEnoughDubloonsRepairStr(%rip), %rdi
-                xorq %rax, %rax
-                call printf
-                jmp .Lresupply.loop
+    cmpb $110, %al                          # Checks if user input is 'n'
+    je .Lresupply.loop
 
-        .Lresupply.buycannons:
-            lea ship_cannons(%rip), %rdi
-            lea ship_max_cannons(%rip), %rsi
-            movl $20, %edx
-            call purchase
-            jmp .Lresupply.loop
-            
-        .Lresupply.upgradeship:
+    # TODO: Add error case for unrecognized input
+
+.Lresupply.repairConfirmed:
+    movl -4(%rbp), %eax
+    cmpl ship_dubloons(%rip), %eax
+    jg 1f                                   # Jump to case if player can't afford repairs
+
+    lea ship_dubloons(%rip), %rdi
+    movl -8(%rbp), %esi
+    negl %esi
+    call updateStat
+    lea ship_health(%rip), %rdi
+    movl -4(%rbp), %esi
+    call updateStat
+    jmp .Lresupply.loop
+
+1:
+    lea notEnoughDubloonsRepairStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    jmp .Lresupply.loop
+
+.Lresupply.buycannons:
+    lea ship_cannons(%rip), %rdi
+    lea ship_max_cannons(%rip), %rsi
+    movl $20, %edx
+    call purchase
+    jmp .Lresupply.loop
+    
+.Lresupply.upgradeship:
+    movl $5000, %eax
+    movl ship_level(%rip), %edi
+    imull $2000, %edi, %edi
+    addl %edi, %eax
+    movl %eax, -4(%rbp)                     # Stores upgrade cost in local memory
+
+    lea upgradePrompt(%rip), %rdi
+    movl ship_level(%rip), %esi
+    incl %esi
+    movl -4(%rbp), %edx
+    xorq %rax, %rax
+    call printf
+
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+
+    movb char_buf(%rip), %al
+    cmpb $121, %al                          # Checks if user input is 'y'
+    je 1f
+    cmpb $110, %al
+    je .Lresupply.loop
+
+# TODO: Add error case for unrecognized input
+
+1:
+    movl -4(%rbp), %eax
+    cmpl ship_dubloons(%rip), %eax
+    jg 1f                                   # Jump to case if player can't afford upgrade
+    jl 2f                                   # Jump to case if player can afford upgrade
+
+1:
+    lea notEnoughDubloonsUpgradeStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    jmp .Lresupply.loop
+
+2:
+    lea ship_dubloons(%rip), %rdi
+    movl -4(%rbp), %esi
+    negl %esi
+    call updateStat
+    lea ship_level(%rip), %rdi
+    movl $1, %esi
+    call updateStat
+    call updateMax
+    jmp .Lresupply.loop
 
 
-    .Lresupply.exit:
+.Lresupply.exit:
     # Tear down local stack frame
     movq %rbp, %rsp
     popq %rbp
@@ -305,548 +358,544 @@ voyage:
     movl $18, voyage_weeks_left(%rip)
     movl $0, voyage_current_week(%rip)
     movl $3, voyage_resupply_time(%rip)
-    .Lvoyage.loop:
-        # TODO: Add resupply check here
-        movl voyage_resupply_time(%rip), %eax
-        test %eax, %eax
-        # Jump to a label or call a function or something here
 
-        # No resupply, continue on from here
-        # Prints game data for player
-        lea weekLabel(%rip), %rdi
-        movl voyage_current_week(%rip), %esi
-        xorq %rax, %rax
-        call printf
+.Lvoyage.loop:
+    # TODO: Add resupply check here
+    movl voyage_resupply_time(%rip), %eax
+    test %eax, %eax
+    jz .Lvoyage.resupply
+    jmp .Lvoyage.noResupply
 
-        lea weeksLeftStr(%rip), %rdi
-        movl voyage_weeks_left(%rip), %esi
-        xorq %rax, %rax
-        call printf
+.Lvoyage.resupply:
+    call resupply                           # Resupply if resupply time is 0, and reset resupply time, skip to end of loop
+    addl $3, voyage_resupply_time(%rip)     # Resupply takes 3 weeks, so add 3 to resupply time
+    jmp .Lvoyage.loop.end
 
-        lea levelWeeklyStr(%rip), %rdi
-        movl ship_level(%rip), %esi
-        xorq %rax, %rax
-        call printf
+.Lvoyage.noResupply:                        # No resupply, continue on from here
+    lea weekLabel(%rip), %rdi               # Prints game data for player. 
+    movl voyage_current_week(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-        lea limesWeeklyStr(%rip), %rdi
-        movl ship_limes(%rip), %esi
-        movl ship_max_limes(%rip), %edx
-        xorq %rax, %rax
-        call printf
+    lea weeksLeftStr(%rip), %rdi
+    movl voyage_weeks_left(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-        lea mateysWeeklyStr(%rip), %rdi
-        movl ship_mateys(%rip), %esi
-        movl ship_max_mateys(%rip), %edx
-        xorq %rax, %rax
-        call printf
+    lea levelWeeklyStr(%rip), %rdi
+    movl ship_level(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-        lea bootyWeeklyStr(%rip), %rdi
-        movl ship_booty(%rip), %esi
-        movl ship_max_booty(%rip), %edx
-        xorq %rax, %rax
-        call printf
+    lea limesWeeklyStr(%rip), %rdi
+    movl ship_limes(%rip), %esi
+    movl ship_max_limes(%rip), %edx
+    xorq %rax, %rax
+    call printf
 
-        lea healthWeeklyStr(%rip), %rdi
-        movl ship_health(%rip), %esi
-        movl ship_max_health(%rip), %edx
-        xorq %rax, %rax
-        call printf
+    lea mateysWeeklyStr(%rip), %rdi
+    movl ship_mateys(%rip), %esi
+    movl ship_max_mateys(%rip), %edx
+    xorq %rax, %rax
+    call printf
 
-        lea dubloonsWeeklyStr(%rip), %rdi
-        movl ship_dubloons(%rip), %esi
-        xorq %rax, %rax
-        call printf
+    lea bootyWeeklyStr(%rip), %rdi
+    movl ship_booty(%rip), %esi
+    movl ship_max_booty(%rip), %edx
+    xorq %rax, %rax
+    call printf
 
-        lea cannonsWeeklyStr(%rip), %rdi
-        movl ship_cannons(%rip), %esi
-        movl ship_max_cannons(%rip), %edx
-        xorq %rax, %rax
-        call printf
+    lea healthWeeklyStr(%rip), %rdi
+    movl ship_health(%rip), %esi
+    movl ship_max_health(%rip), %edx
+    xorq %rax, %rax
+    call printf
 
-        lea weeksUntilResupplyStr(%rip), %rdi
-        movl voyage_resupply_time(%rip), %esi
-        xorq %rax, %rax
-        call printf
+    lea dubloonsWeeklyStr(%rip), %rdi
+    movl ship_dubloons(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-        # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in eax
-        movl $9, %edi
-        call randint
+    lea cannonsWeeklyStr(%rip), %rdi
+    movl ship_cannons(%rip), %esi
+    movl ship_max_cannons(%rip), %edx
+    xorq %rax, %rax
+    call printf
 
-        # Compares RNG result and jumps
-        cmpl $0, %eax 
-        je .Lvoyage.becalmed
+    lea weeksUntilResupplyStr(%rip), %rdi
+    movl voyage_resupply_time(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-        cmpl $1, %eax 
-        je .Lvoyage.becalmed
+    movl $9, %edi                           # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in eax
+    call randint
 
-        cmpl $2, %eax 
-        je .Lvoyage.storm
+    cmpl $0, %eax                           # Compares RNG result and jumps
+    je .Lvoyage.becalmed
 
-        cmpl $3, %eax 
-        je .Lvoyage.warship
+    cmpl $1, %eax 
+    je .Lvoyage.becalmed
 
-        cmpl $4, %eax 
-        je .Lvoyage.merchantman
+    cmpl $2, %eax 
+    je .Lvoyage.storm
 
-        cmpl $5, %eax 
-        je .Lvoyage.merchantman
+    cmpl $3, %eax 
+    je .Lvoyage.warship
 
-        jmp .Lvoyage.loop.end               # default
+    cmpl $4, %eax 
+    je .Lvoyage.merchantman
 
-        # ebx no longer needs to be preserved after this point
-        .Lvoyage.becalmed:
+    cmpl $5, %eax 
+    je .Lvoyage.merchantman
 
-            incl voyage_weeks_left(%rip)
+    jmp .Lvoyage.loop.end                   # default
 
-            incl voyage_resupply_time(%rip)
+.Lvoyage.becalmed:                          # ebx no longer needs to be preserved after this point
+    incl voyage_weeks_left(%rip)
 
-            lea becalmedMessage(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    incl voyage_resupply_time(%rip)
 
-            jmp .Lvoyage.loop.end
-        .Lvoyage.storm:
-            movl $50, %edi
-            call randint
-            movl %eax, -4(%rbp)             # Mateys killed
+    lea becalmedMessage(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            movl %eax, %esi
-            lea ship_mateys(%rip), %rdi
-            negl %esi
-            call updateStat                 # Update mateys
+    jmp .Lvoyage.loop.end
 
-            movl $50, %edi
-            call randint
-            movl %eax, -8(%rbp)             # Ship damage
+.Lvoyage.storm:
+    movl $50, %edi
+    call randint
+    movl %eax, -4(%rbp)                     # Mateys killed
 
-            movl %eax, %esi
-            lea ship_health(%rip), %rdi
-            negl %esi
-            call updateStat                 # Update health
+    movl %eax, %esi
+    lea ship_mateys(%rip), %rdi
+    negl %esi
+    call updateStat                         # Update mateys
 
-            movl $100, %edi
-            call randint
-            movl %eax, -12(%rbp)            # Booty lost
+    movl $50, %edi
+    call randint
+    movl %eax, -8(%rbp)                     # Ship damage
 
-            movl %eax, %esi
-            lea ship_booty(%rip), %rdi
-            negl %esi
-            call updateStat                 # Update booty
+    movl %eax, %esi
+    lea ship_health(%rip), %rdi
+    negl %esi
+    call updateStat                         # Update health
 
-            # If randint returns 0, or the ship damage is greater than the ship's health, the ship sinks
-            movl $100, %edi
-            call randint
-            test %eax, %eax
-            jz 1f
-            movl ship_health(%rip), %eax    # Retrieve damage
-            test %eax, %eax
-            jz 1f
-            jmp 2f
-            1:
-                lea destroyedStormMessage(%rip), %rdi
-                xorq %rax, %rax
-                call printf
+    movl $100, %edi
+    call randint
+    movl %eax, -12(%rbp)                    # Booty lost
 
-                movq $1, %rax               # 1 denotes that the game is over
-                jmp .Lvoyage.exit
+    movl %eax, %esi
+    lea ship_booty(%rip), %rdi
+    negl %esi
+    call updateStat                         # Update booty
 
-            2:
-                lea caughtStormMessage(%rip), %rdi
-                xorq %rax, %rax
-                call printf
+    movl $100, %edi                         # If randint returns 0, or the ship damage is greater than the ship's health, the ship sinks
+    call randint
+    test %eax, %eax
+    jz 1f
+    movl ship_health(%rip), %eax            # Retrieve damage
+    test %eax, %eax
+    jz 1f
+    jmp 2f
 
-                lea mateysKilledStr(%rip), %rdi
-                movl -4(%rbp), %esi
-                xorq %rax, %rax
-                call printf
+1:
+    lea destroyedStormMessage(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-                lea shipDamageStr(%rip), %rdi
-                movl -8(%rbp), %esi
-                xorq %rax, %rax
-                call printf
+    movq $1, %rax                           # 1 denotes that the game is over
+    jmp .Lvoyage.exit
 
-                lea bootyLostStr(%rip), %rdi
-                movl -12(%rbp), %esi
-                xorq %rax, %rax
-                call printf
+2:
+    lea caughtStormMessage(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-                jmp .Lvoyage.loop.end
+    lea mateysKilledStr(%rip), %rdi
+    movl -4(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-        .Lvoyage.warship:
-            movl $2, %edi
-            call randint
-            test %eax, %eax
-            jz .Lvoyage.warship.manowar
-            jnz .Lvoyage.warship.frigate
+    lea shipDamageStr(%rip), %rdi
+    movl -8(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-            .Lvoyage.warship.manowar:
-                lea manowarName(%rip), %rdi
-                movq %rdi, -8(%rbp)         # Warship Name: "Man-o-War"
-                movl $30000, -12(%rbp)      # Warship reward: 30000 dubloons
-                movsd double_002(%rip), %xmm1          # Warship win factor: 0.02
-                jmp .Lvoyage.warship.event
+    lea bootyLostStr(%rip), %rdi
+    movl -12(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-            .Lvoyage.warship.frigate:
-                lea frigateName(%rip), %rdi
-                movq %rdi, -8(%rbp)         # Warship Name: "Frigate"
-                movl $5000, -12(%rbp)       # Warship reward: 5000 dubloons
-                movsd double_01(%rip), %xmm1           # Warship win factor: 0.1
-                jmp .Lvoyage.warship.event
+    jmp .Lvoyage.loop.end
 
-            .Lvoyage.warship.event:
-            # Calculate fight win chance (technically a lie, as damage can also cause a loss)
-            # fight win chance = 1 - 1/((ship_cannons * xmm1) + 1)
-            cvtsi2sd ship_cannons(%rip), %xmm0
-            mulsd %xmm1, %xmm0
-            addsd double_1(%rip), %xmm0
-            movsd double_1(%rip), %xmm1
-            divsd %xmm0, %xmm1          
-            movsd double_1(%rip), %xmm0
-            subsd %xmm1, %xmm0
+.Lvoyage.warship:
+    movl $2, %edi
+    call randint
+    test %eax, %eax
+    jz .Lvoyage.warship.manowar
+    jnz .Lvoyage.warship.frigate
 
-            movsd %xmm0, -20(%rbp)          # stores fight win chance in local memory
+.Lvoyage.warship.manowar:
+    lea manowarName(%rip), %rdi
+    movq %rdi, -8(%rbp)                     # Warship Name: "Man-o-War"
+    movl $30000, -12(%rbp)                  # Warship reward: 30000 dubloons
+    movsd double_002(%rip), %xmm1           # Warship win factor: 0.02
+    jmp .Lvoyage.warship.event
 
-            # Print messages to player
-            lea attackAnnounceStr(%rip), %rdi
-            movq -8(%rbp), %rsi
-            xorq %rax, %rax
-            call printf
+.Lvoyage.warship.frigate:
+    lea frigateName(%rip), %rdi
+    movq %rdi, -8(%rbp)                     # Warship Name: "Frigate"
+    movl $5000, -12(%rbp)                   # Warship reward: 5000 dubloons
+    movsd double_01(%rip), %xmm1            # Warship win factor: 0.1
+    jmp .Lvoyage.warship.event
 
-            lea cannonNumStr(%rip), %rdi
-            movl ship_cannons(%rip), %esi
-            xorq %rax, %rax
-            call printf
+.Lvoyage.warship.event:
+    cvtsi2sd ship_cannons(%rip), %xmm0      # Calculate fight win chance (technically a lie, as damage can also cause a loss)
+    mulsd %xmm1, %xmm0                      # fight win chance = 1 - 1/((ship_cannons * xmm1) + 1)
+    addsd double_1(%rip), %xmm0
+    movsd double_1(%rip), %xmm1
+    divsd %xmm0, %xmm1          
+    movsd double_1(%rip), %xmm0
+    subsd %xmm1, %xmm0
 
-            movsd -20(%rbp), %xmm0
-            movsd double_100(%rip), %xmm1
-            mulsd %xmm1, %xmm0
-            lea fightChanceStr(%rip), %rdi
-            movb $1, %al
-            call printf
+    movsd %xmm0, -20(%rbp)                  # stores fight win chance in local memory
 
-            lea flee_success_chance_90(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    lea attackAnnounceStr(%rip), %rdi       # Print messages to player
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
 
-            lea to_fight(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    lea cannonNumStr(%rip), %rdi
+    movl ship_cannons(%rip), %esi
+    xorq %rax, %rax
+    call printf
 
-            lea to_flee(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    movsd -20(%rbp), %xmm0
+    movsd double_100(%rip), %xmm1
+    mulsd %xmm1, %xmm0
+    lea fightChanceStr(%rip), %rdi
+    movb $1, %al
+    call printf
 
-            lea attackPrompt(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    lea flee_success_chance_90(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            lea char_buf(%rip), %rdi
-            movl $128, %esi
-            call fgets_stdin
-            movb char_buf(%rip), %al        # Fuck it we ball
+    lea to_fight(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            cmpb $49, %al
-            je .Lvoyage.warship.fight       # checks if user typed '1'
+    lea to_flee(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            cmpb $50, %al                   
-            je .Lvoyage.warship.flee        # checks if user typed '2'
+    lea attackPrompt(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            movq $2, %rax                 
-            jmp .Lvoyage.exit               # Error on unrecognized input
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+    movb char_buf(%rip), %al                # Fuck it we ball
 
-            .Lvoyage.warship.fight:
-                call randfp               # stores random double between 0 and 1 in xmm0
-                # xmm0 must be LESS THAN the win probability for the player to win
-                movsd -20(%rbp), %xmm1
-                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
-                jb 1f                       # win chance is less than xmm0                 
-                ja 2f                       # win chance is greater than xmm0
-                1:                          # Warship wins
-                    lea fightDefeatStr(%rip), %rdi
-                    xorq %rax, %rax
-                    call printf
-                    movq $1, %rax
-                    jmp .Lvoyage.exit
-                2:                          # Player wins
-                    movl $40, %edi
-                    call randint
-                    movl %eax, -24(%rbp)    # Mateys lost
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_mateys(%rip), %rdi
-                    call updateStat         # Update
+    cmpb $49, %al
+    je .Lvoyage.warship.fight               # checks if user typed '1'
 
-                    movl $30, %edi
-                    call randint
-                    movl %eax, -28(%rbp)    # Damage taken
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_health(%rip), %rdi
-                    call updateStat         # Update
-                    # Ship health is stored in eax
+    cmpb $50, %al                   
+    je .Lvoyage.warship.flee                # checks if user typed '2'
 
-                    or ship_mateys(%rip), %eax
-                    jz 1f                   # If either mateys or health are 0, jump to pyrrhic victory
-                    jmp 2f                  # Otherwise, jump to victory
+    movq $2, %rax                 
+    jmp .Lvoyage.exit                       # Error on unrecognized input
 
-                    1:                      # Pyrrhic victory
-                        lea pyrrhicVictoryStr(%rip), %rdi
-                        movq -8(%rbp), %rsi
-                        xorq %rax, %rax
-                        call printf
-                        movq $1, %rax
-                        jmp .Lvoyage.exit
-                    2:                      # Victory
-                        lea fightVictoryStr(%rip), %rdi
-                        movq -8(%rbp), %rsi
-                        xorq %rax, %rax
-                        call printf
+.Lvoyage.warship.fight:
+    call randfp                             # stores random double between 0 and 1 in xmm0
+    movsd -20(%rbp), %xmm1                  # xmm0 must be LESS THAN the win probability for the player to win
+    ucomisd %xmm0, %xmm1                    # compares xmm0 to win chance
+    jb 1f                                   # win chance is less than xmm0                 
+    ja 2f                                   # win chance is greater than xmm0
 
-                        lea mateysKilledStr(%rip), %rdi
-                        movl -24(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+1:                                          # Warship wins
+    lea fightDefeatStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+    movq $1, %rax
+    jmp .Lvoyage.exit
 
-                        lea shipDamageStr(%rip), %rdi
-                        movl -28(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+2:                                          # Player wins
+    movl $40, %edi
+    call randint
+    movl %eax, -24(%rbp)                    # Mateys lost
+    movl %eax, %esi
+    negl %esi
+    lea ship_mateys(%rip), %rdi
+    call updateStat                         # Update
 
-                        lea dubloonsPillagedStr(%rip), %rdi
-                        movl -12(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+    movl $30, %edi
+    call randint
+    movl %eax, -28(%rbp)                    # Damage taken
+    movl %eax, %esi
+    negl %esi
+    lea ship_health(%rip), %rdi
+    call updateStat                         # Update
 
-                        lea ship_dubloons(%rip), %rdi
-                        movl -12(%rbp), %esi
-                        call updateStat
-                        jmp .Lvoyage.loop.end
+    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    jz 1f                                   # If either mateys or health are 0, jump to pyrrhic victory
+    jmp 2f                                  # Otherwise, jump to victory
 
-            .Lvoyage.warship.flee:
-                call randfp               # stores random double between 0 and 1 in xmm0
-                # xmm0 must be LESS THAN the win probability to win
-                movsd double_09(%rip), %xmm1
-                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
-                jb 1f                       # win chance is lower than xmm0        
-                ja 2f                       # win chance is higher than xmm0
-                1:                          # Warship wins
-                    movl $90, %edi
-                    call randint
-                    movl %eax, -24(%rbp)    # Mateys lost
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_mateys(%rip), %rdi
-                    call updateStat         # Update
+1:                                          # Pyrrhic victory
+    lea pyrrhicVictoryStr(%rip), %rdi
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
+    movq $1, %rax
+    jmp .Lvoyage.exit
 
-                    movl $80, %edi
-                    call randint
-                    movl %eax, -28(%rbp)    # Damage taken
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_health(%rip), %rdi
-                    call updateStat         # Update
-                    # Ship health is stored in eax
+2:                                          # Victory
+    lea fightVictoryStr(%rip), %rdi
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
 
-                    or ship_mateys(%rip), %eax
-                    jz 3f
-                    jmp 4f
+    lea mateysKilledStr(%rip), %rdi
+    movl -24(%rbp), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea shipDamageStr(%rip), %rdi
+    movl -28(%rbp), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea dubloonsPillagedStr(%rip), %rdi
+    movl -12(%rbp), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea ship_dubloons(%rip), %rdi
+    movl -12(%rbp), %esi
+    call updateStat
+    jmp .Lvoyage.loop.end
+
+.Lvoyage.warship.flee:
+    call randfp                             # stores random double between 0 and 1 in xmm0
+    movsd double_09(%rip), %xmm1            # xmm0 must be LESS THAN the win probability to win
+    ucomisd %xmm0, %xmm1                    # compares xmm0 to win chance
+    jb 1f                                   # win chance is lower than xmm0        
+    ja 2f                                   # win chance is higher than xmm0
+
+1:                                          # Warship wins
+    movl $90, %edi
+    call randint
+    movl %eax, -24(%rbp)                    # Mateys lost
+    movl %eax, %esi
+    negl %esi
+    lea ship_mateys(%rip), %rdi
+    call updateStat                         # Update
+
+    movl $80, %edi
+    call randint
+    movl %eax, -28(%rbp)                    # Damage taken
+    movl %eax, %esi
+    negl %esi
+    lea ship_health(%rip), %rdi
+    call updateStat                         # Update
+
+    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    jz 3f
+    jmp 4f
                     
-                    3:                      # HMS Pirate Ship sinks
-                        lea fleeMajorDefeatStr(%rip), %rdi
-                        movq -8(%rbp), %rsi
-                        xorq %rax, %rax
-                        call printf
+3:                                          # HMS Pirate Ship sinks
+    lea fleeMajorDefeatStr(%rip), %rdi
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
 
-                        movq $1, %rax
-                        jmp .Lvoyage.exit
-                    4:                      # HMS Pirate Ship survives
-                        lea fleeDefeatStr(%rip), %rdi
-                        movq -8(%rbp), %rsi
-                        xorq %rax, %rax
-                        call printf
+    movq $1, %rax
+    jmp .Lvoyage.exit
 
-                        lea mateysKilledStr(%rip), %rdi
-                        movl -24(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+4:                                          # HMS Pirate Ship survives
+    lea fleeDefeatStr(%rip), %rdi
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
 
-                        lea shipDamageStr(%rip), %rdi
-                        movl -28(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+    lea mateysKilledStr(%rip), %rdi
+    movl -24(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-                        jmp .Lvoyage.loop.end
+    lea shipDamageStr(%rip), %rdi
+    movl -28(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-                2:                          # Player wins
-                    lea fleeVictoryStr(%rip), %rdi
-                    movq -8(%rbp), %rsi
-                    xorq %rax, %rax
-                    call printf
+    jmp .Lvoyage.loop.end
 
-                    jmp .Lvoyage.loop.end
+2:                                          # Player wins
+    lea fleeVictoryStr(%rip), %rdi
+    movq -8(%rbp), %rsi
+    xorq %rax, %rax
+    call printf
 
-        .Lvoyage.merchantman:
-            # Calculate fight win chance (technically a lie, as damage can also cause a loss)
-            # fight win chance = 1 - 1/((ship_cannons * 0.3) + 1)
-            movsd double_03(%rip), %xmm1
-            cvtsi2sd ship_cannons(%rip), %xmm0
-            mulsd %xmm1, %xmm0
-            addsd double_1(%rip), %xmm0
-            movsd double_1(%rip), %xmm1
-            divsd %xmm0, %xmm1          
-            movsd double_1(%rip), %xmm0
-            subsd %xmm1, %xmm0
+    jmp .Lvoyage.loop.end
 
-            movsd %xmm0, -20(%rbp)          # stores fight win chance in local memory
+.Lvoyage.merchantman:
+    movsd double_03(%rip), %xmm1            # Calculate fight win chance (technically a lie, as damage can also cause a loss)
+    cvtsi2sd ship_cannons(%rip), %xmm0      # fight win chance = 1 - 1/((ship_cannons * 0.3) + 1)
+    mulsd %xmm1, %xmm0
+    addsd double_1(%rip), %xmm0
+    movsd double_1(%rip), %xmm1
+    divsd %xmm0, %xmm1          
+    movsd double_1(%rip), %xmm0
+    subsd %xmm1, %xmm0
 
-            # Generates integer between 0 and 9 (inclusive), stores in rax
-            movl $10, %edi
-            call randint
+    movsd %xmm0, -20(%rbp)                  # stores fight win chance in local memory
 
-            # Stores loot_table[rax] in -12(%rbp), this is how much loot will be rewarded
-            lea loot_table(%rip), %rcx
-            movl (%rcx,%rax,4), %edx
-            movl %edx, -12(%rbp)
+    movl $10, %edi                          # Generates integer between 0 and 9 (inclusive), stores in rax
+    call randint
 
-            lea merchantmanAnnouncement(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    lea loot_table(%rip), %rcx              # Stores loot_table[rax] in -12(%rbp), this is how much loot will be rewarded
+    movl (%rcx,%rax,4), %edx
+    movl %edx, -12(%rbp)
 
-            movsd -20(%rbp), %xmm0
-            movsd double_100(%rip), %xmm1
-            mulsd %xmm1, %xmm0
-            
-            lea successChanceStr(%rip), %rdi
-            movb $1, %al
-            call printf
+    lea merchantmanAnnouncement(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            lea merchantmanAttackPrompt(%rip), %rdi
-            xorq %rax, %rax
-            call printf
+    movsd -20(%rbp), %xmm0
+    movsd double_100(%rip), %xmm1
+    mulsd %xmm1, %xmm0
+    
+    lea successChanceStr(%rip), %rdi
+    movb $1, %al
+    call printf
 
-            lea char_buf(%rip), %rdi
-            movl $128, %esi
-            call fgets_stdin
-            movb char_buf(%rip), %al            # Fuck it we ball
+    lea merchantmanAttackPrompt(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-            cmpb $121, %al
-            je .Lvoyage.merchantman.attack
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+    movb char_buf(%rip), %al                # Fuck it we ball
 
-            cmpb $110, %al
-            je .Lvoyage.loop.end
+    cmpb $121, %al
+    je .Lvoyage.merchantman.attack
 
-            movq $2, %rax                   # Error on unrecognized input
-            jmp .Lvoyage.exit
+    cmpb $110, %al
+    je .Lvoyage.loop.end
 
-            .Lvoyage.merchantman.attack:
-                call randfp                 # stores random double between 0 and 1 in xmm0
-                # xmm0 must be LESS THAN the win probability for player to win
-                movsd -20(%rbp), %xmm1
-                ucomisd %xmm0, %xmm1        # compares xmm0 to win chance
-                jb 1f                       # win chance is lower than xmm0                   
-                ja 2f                       # win chance is higher than xmm0
-                1:                          # Merchantman wins
-                    movl $40, %edi
-                    call randint
-                    movl %eax, -24(%rbp)    # Mateys lost
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_mateys(%rip), %rdi
-                    call updateStat         # Update
+    movq $2, %rax                           # Error on unrecognized input
+    jmp .Lvoyage.exit
 
-                    movl $40, %edi
-                    call randint
-                    movl %eax, -28(%rbp)    # Damage taken
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_health(%rip), %rdi
-                    call updateStat         # Update
-                    # Ship health is stored in eax
+.Lvoyage.merchantman.attack:
+    call randfp                             # stores random double between 0 and 1 in xmm0
+    movsd -20(%rbp), %xmm1                  # xmm0 must be LESS THAN the win probability for player to win
+    ucomisd %xmm0, %xmm1                    # compares xmm0 to win chance
+    jb 1f                                   # win chance is lower than xmm0                   
+    ja 2f                                   # win chance is higher than xmm0
 
-                    or ship_mateys(%rip), %eax
-                    jz 3f
-                    jmp 4f
+1:                                          # Merchantman wins
+    movl $40, %edi
+    call randint
+    movl %eax, -24(%rbp)                    # Mateys lost
+    movl %eax, %esi
+    negl %esi
+    lea ship_mateys(%rip), %rdi
+    call updateStat                         # Update
+
+    movl $40, %edi
+    call randint
+    movl %eax, -28(%rbp)                    # Damage taken
+    movl %eax, %esi
+    negl %esi
+    lea ship_health(%rip), %rdi
+    call updateStat                         # Update
+
+    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    jz 3f
+    jmp 4f
                     
-                    3:                      # HMS Pirate Ship sinks
-                        lea majorDefeatMerchantmanStr(%rip), %rdi
-                        xorq %rax, %rax
-                        call printf
+3:                                          # HMS Pirate Ship sinks
+    lea majorDefeatMerchantmanStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-                        movq $1, %rax
-                        jmp .Lvoyage.exit
-                    4:                      # HMS Pirate Ship survives
-                        lea defeatMerchantmanStr(%rip), %rdi
-                        xorq %rax, %rax
-                        call printf
+    movq $1, %rax
+    jmp .Lvoyage.exit
 
-                        lea mateysKilledStr(%rip), %rdi
-                        movl -24(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+4:                                          # HMS Pirate Ship survives
+    lea defeatMerchantmanStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-                        lea shipDamageStr(%rip), %rdi
-                        movl -28(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+    lea mateysKilledStr(%rip), %rdi
+    movl -24(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-                        jmp .Lvoyage.loop.end
+    lea shipDamageStr(%rip), %rdi
+    movl -28(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-                2:                          # Player wins
-                    movl $20, %edi
-                    call randint
-                    movl %eax, -24(%rbp)    # Mateys lost
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_mateys(%rip), %rdi
-                    call updateStat         # Update
+    jmp .Lvoyage.loop.end
 
-                    movl $10, %edi
-                    call randint
-                    movl %eax, -28(%rbp)    # Damage taken
-                    movl %eax, %esi
-                    negl %esi
-                    lea ship_health(%rip), %rdi
-                    call updateStat         # Update
-                    # Ship health is stored in eax
+2:                                          # Player wins
+    movl $20, %edi
+    call randint
+    movl %eax, -24(%rbp)                    # Mateys lost
+    movl %eax, %esi
+    negl %esi
+    lea ship_mateys(%rip), %rdi
+    call updateStat                         # Update
 
-                    or ship_mateys(%rip), %eax
-                    jz 3f                   # If either mateys or health are 0, jump to pyrrhic victory
-                    jmp 4f                  # Otherwise, jump to victory
+    movl $10, %edi
+    call randint
+    movl %eax, -28(%rbp)                    # Damage taken
+    movl %eax, %esi
+    negl %esi
+    lea ship_health(%rip), %rdi
+    call updateStat                         # Update
 
-                    3:                      # Pyrrhic victory
-                        lea pyrrhicVictoryMerchantmanStr(%rip), %rdi
-                        xorq %rax, %rax
-                        call printf
+    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    jz 3f                                   # If either mateys or health are 0, jump to pyrrhic victory
+    jmp 4f                                  # Otherwise, jump to victory
 
-                        movq $1, %rax
-                        jmp .Lvoyage.exit
-                    4:                      # Victory
-                        lea victoryMerchantmanStr(%rip), %rdi
-                        call printf
+3:                                          # Pyrrhic victory
+    lea pyrrhicVictoryMerchantmanStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
 
-                        lea mateysKilledStr(%rip), %rdi
-                        movl -24(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+    movq $1, %rax
+    jmp .Lvoyage.exit
 
-                        lea shipDamageStr(%rip), %rdi
-                        movl -28(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+4:                      # Victory
+    lea victoryMerchantmanStr(%rip), %rdi
+    call printf
 
-                        lea bootyPlunderedStr(%rip), %rdi
-                        movl -12(%rbp), %esi
-                        xorq %rax, %rax
-                        call printf
+    lea mateysKilledStr(%rip), %rdi
+    movl -24(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-                        lea ship_booty(%rip), %rdi
-                        lea ship_max_booty(%rip), %rsi
-                        movl -12(%rbp), %edx
-                        call updateStatWithMax
-                        jmp .Lvoyage.loop.end
+    lea shipDamageStr(%rip), %rdi
+    movl -28(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
-    .Lvoyage.loop.end:
+    lea bootyPlunderedStr(%rip), %rdi
+    movl -12(%rbp), %esi
+    xorq %rax, %rax
+    call printf
 
+    lea ship_booty(%rip), %rdi
+    lea ship_max_booty(%rip), %rsi
+    movl -12(%rbp), %edx
+    call updateStatWithMax
+    jmp .Lvoyage.loop.end
+
+.Lvoyage.loop.end:
     lea voyage_weeks_left(%rip), %rdi       # Update voyage weeks left
     movl $-1, %esi
     call updateStat
@@ -872,7 +921,7 @@ voyage:
 
     jmp .Lvoyage.loop
     
-    .Lvoyage.exit:
+.Lvoyage.exit:
     # Tear down local stack frame
     movq %rbp, %rsp
     popq %rbp
@@ -881,25 +930,24 @@ voyage:
 .size voyage, . - voyage
 
 
-# The main entry point is called 'main' and not '_start' because this program is designed to run inside the C runtime environment
-.globl main
+
+.globl main                                 # The main entry point is called 'main' and not '_start' because this program is designed to run inside the C runtime environment
 .type main, @function
 main:
     sub $8, %rsp                            # Align stack pointer on 16 bytes, as the code begins misaligned because the CRT's call to main pushes a return pointer to the stack
     call srand_vg
-    .Lmain.loop:
-        # Begin game
-        movl $300, ship_limes(%rip)
-        movl $180, ship_mateys(%rip)
-        movl $0, ship_booty(%rip)
-        movl $23, ship_cannons(%rip)
-        movl $100, ship_health(%rip)
-        movl $300, ship_dubloons(%rip)
-        movl $1, ship_level(%rip)
-        call updateMax
-        call voyage
+.Lmain.loop:                                # Begin Game
+    movl $300, ship_limes(%rip)
+    movl $180, ship_mateys(%rip)
+    movl $0, ship_booty(%rip)
+    movl $23, ship_cannons(%rip)
+    movl $100, ship_health(%rip)
+    movl $300, ship_dubloons(%rip)
+    movl $1, ship_level(%rip)
+    call updateMax
+    call voyage
         
-    .Lmain.exit:
+.Lmain.exit:
     add $8, %rsp                             # return stack pointer back to where it was originally so we can return properly
     mov $0, %rax                             # return 0
     ret
@@ -941,6 +989,11 @@ confirmPurchaseStr: .ascii "Confirm purchase of %d units for %d dubloons? [y/n]\
 repairPrompt: .ascii "Cost to repair ship: %d dubloons. Confirm repair? [y/n]\n\0"
 notEnoughDubloonsRepairStr: .ascii "You cannot repair your ship, you don't have enough dubloons!\n\0"
 repairConfirmStr: .ascii "Your ship has been repaired by %d health points!\n\0"
+
+# Upgrade strings
+upgradePrompt: .ascii "Cost to upgrade ship to level %d: %d dubloons. Confirm upgrade? [y/n]\n\0"
+notEnoughDubloonsUpgradeStr: .ascii "You cannot upgrade your ship, you don't have enough dubloons!\n\0"
+upgradeConfirmStr: .ascii "Your ship has been upgraded to level %d! Your max stats have increased!\n\0"
 
 # Becalmed messages
 becalmedMessage: .ascii "The HMS Pirate Ship has been becalmed!\n\0"
@@ -998,6 +1051,7 @@ istrc: .ascii "%c\0"
 
 game_state: .byte 0                         # 0 means game is active, 1 means game not active, 2 means error
 return_voyage: .byte 1                      # whether or not the game is on a return voyage
+voyage_counter: .long 0                     # counts how many voyages the player has completed
 
 .section .bss
 .lcomm voyage_weeks_left, 4                   
