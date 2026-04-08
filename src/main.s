@@ -1050,7 +1050,7 @@ istrc: .ascii "%c\0"
 .section .data
 
 game_state: .byte 0                         # 0 means game is active, 1 means game not active, 2 means error
-return_voyage: .byte 1                      # whether or not the game is on a return voyage
+return_voyage: .byte 0                      # whether or not the game is on a return voyage
 voyage_counter: .long 0                     # counts how many voyages the player has completed
 
 .section .bss
