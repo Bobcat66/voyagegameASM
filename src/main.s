@@ -1198,7 +1198,7 @@ voyage_counter: .long 0                     # counts how many voyages the player
 
 .lcomm char_buf, 128
 
-
+.section .note.GNU-stack,"",@progbits
 
 
 
