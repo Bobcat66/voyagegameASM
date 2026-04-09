@@ -1013,9 +1013,6 @@ main:
     addl %eax, ship_dubloons(%rip)          # Convert booty to dubloons at end of each voyage
     movl $0, ship_booty(%rip)               # Reset booty to 0 at end of each voyage
 
-    cmpl $1, game_state(%rip)
-    je .Lmain.exit
-
     addl $1, voyage_counter(%rip)
 
     lea endgamePrompt(%rip), %rdi
@@ -1173,8 +1170,6 @@ totalScoreStatsStr: .ascii "Total score: %d\n\0"
 
 .section .data
 
-game_state: .byte 0                         # 0 means game is active, 1 means game not active, 2 means error
-return_voyage: .byte 0                      # whether or not the game is on a return voyage
 voyage_counter: .long 0                     # counts how many voyages the player has completed
 
 .section .bss
