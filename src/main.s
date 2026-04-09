@@ -60,6 +60,56 @@ updateStat:
     ret
 .size updateStat, . - updateStat
 
+/*
+ * void printShipData()
+ *
+ * returns a copy of the updated stat's value. 
+ * Stat will be set at zero if adding 
+ * the delta would make it negative
+ */
+.type printShipData, @function
+printShipData:
+    lea levelShipDataStr(%rip), %rdi
+    movl ship_level(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea limesShipDataStr(%rip), %rdi
+    movl ship_limes(%rip), %esi
+    movl ship_max_limes(%rip), %edx
+    xorq %rax, %rax
+    call printf
+
+    lea mateysShipDataStr(%rip), %rdi
+    movl ship_mateys(%rip), %esi
+    movl ship_max_mateys(%rip), %edx
+    xorq %rax, %rax
+    call printf
+
+    lea bootyShipDataStr(%rip), %rdi
+    movl ship_booty(%rip), %esi
+    movl ship_max_booty(%rip), %edx
+    xorq %rax, %rax
+    call printf
+
+    lea healthShipDataStr(%rip), %rdi
+    movl ship_health(%rip), %esi
+    movl ship_max_health(%rip), %edx
+    xorq %rax, %rax
+    call printf
+
+    lea dubloonsShipDataStr(%rip), %rdi
+    movl ship_dubloons(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea cannonsShipDataStr(%rip), %rdi
+    movl ship_cannons(%rip), %esi
+    movl ship_max_cannons(%rip), %edx
+    xorq %rax, %rax
+    call printf
+.size printShipData, . - printShipData
+
 /* 
  * int updateStatWithMax(int *stat, int *max, int delta)
  *
@@ -219,14 +269,14 @@ resupply:
     lea ship_max_limes(%rip), %rsi
     movl $1, %edx
     call purchase
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
 
 .Lresupply.recruitmateys:
     lea ship_mateys(%rip), %rdi
     lea ship_max_mateys(%rip), %rsi
     movl $6, %edx
     call purchase
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
 
 .Lresupply.repairship:
     movl ship_max_health(%rip), %eax
@@ -249,12 +299,12 @@ resupply:
     je .Lresupply.repairConfirmed
 
     cmpb $110, %al                          # Checks if user input is 'n'
-    je .Lresupply.loop
+    je .Lresupply.loop.end
 
     # TODO: Add error case for unrecognized input
 
 .Lresupply.repairConfirmed:
-    movl -4(%rbp), %eax
+    movl -8(%rbp), %eax
     cmpl ship_dubloons(%rip), %eax
     jg 1f                                   # Jump to case if player can't afford repairs
 
@@ -265,20 +315,20 @@ resupply:
     lea ship_health(%rip), %rdi
     movl -4(%rbp), %esi
     call updateStat
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
 
 1:
     lea notEnoughDubloonsRepairStr(%rip), %rdi
     xorq %rax, %rax
     call printf
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
 
 .Lresupply.buycannons:
     lea ship_cannons(%rip), %rdi
     lea ship_max_cannons(%rip), %rsi
     movl $20, %edx
     call purchase
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
     
 .Lresupply.upgradeship:
     movl $5000, %eax
@@ -316,7 +366,7 @@ resupply:
     lea notEnoughDubloonsUpgradeStr(%rip), %rdi
     xorq %rax, %rax
     call printf
-    jmp .Lresupply.loop
+    jmp .Lresupply.loop.end
 
 2:
     lea ship_dubloons(%rip), %rdi
@@ -327,6 +377,10 @@ resupply:
     movl $1, %esi
     call updateStat
     call updateMax
+    jmp .Lresupply.loop.end
+
+.Lresupply.loop.end:
+    call printShipData
     jmp .Lresupply.loop
 
 
@@ -360,7 +414,61 @@ voyage:
     movl $3, voyage_resupply_time(%rip)
 
 .Lvoyage.loop:
-    # TODO: Add resupply check here
+    movl voyage_weeks_left(%rip), %eax
+    test %eax, %eax
+    movq $0, %rax                           # 0 denotes that the game is not over
+    jz .Lvoyage.exit
+
+    movl ship_limes(%rip), %eax             # Not enough limes results in scurvy, which causes the player to lose mateys every week until they get more limes. If the player has no mateys left, the game is over.
+    test %eax, %eax
+    jnz 1f
+
+    lea noLimesMessage(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    movl $20, %edi
+    call randint
+    movl %eax, -4(%rbp)                     # Mateys killed
+
+    lea mateysKilledStr(%rip), %rdi
+    movl -4(%rbp), %esi
+    xorq %rax, %rax
+    call printf
+
+    movl -4(%rbp), %esi
+    lea ship_mateys(%rip), %rdi
+    negl %esi
+    call updateStat                         # Update mateys
+
+    movl ship_mateys(%rip), %eax
+    test %eax, %eax
+    jnz 1f
+
+    lea mateysDeadMessage(%rip), %rdi       # All mateys dead from scurvy, game over
+    xorq %rax, %rax
+    call printf
+    movq $1, %rax                           # 1 denotes that the game is over
+    jmp .Lvoyage.exit
+
+1:
+    lea weekLabel(%rip), %rdi               # Prints game data for player. 
+    movl voyage_current_week(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea weeksLeftStr(%rip), %rdi
+    movl voyage_weeks_left(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea weeksUntilResupplyStr(%rip), %rdi
+    movl voyage_resupply_time(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    call printShipData                      # Print ship data for player
+
     movl voyage_resupply_time(%rip), %eax
     test %eax, %eax
     jz .Lvoyage.resupply
@@ -372,60 +480,6 @@ voyage:
     jmp .Lvoyage.loop.end
 
 .Lvoyage.noResupply:                        # No resupply, continue on from here
-    lea weekLabel(%rip), %rdi               # Prints game data for player. 
-    movl voyage_current_week(%rip), %esi
-    xorq %rax, %rax
-    call printf
-
-    lea weeksLeftStr(%rip), %rdi
-    movl voyage_weeks_left(%rip), %esi
-    xorq %rax, %rax
-    call printf
-
-    lea levelWeeklyStr(%rip), %rdi
-    movl ship_level(%rip), %esi
-    xorq %rax, %rax
-    call printf
-
-    lea limesWeeklyStr(%rip), %rdi
-    movl ship_limes(%rip), %esi
-    movl ship_max_limes(%rip), %edx
-    xorq %rax, %rax
-    call printf
-
-    lea mateysWeeklyStr(%rip), %rdi
-    movl ship_mateys(%rip), %esi
-    movl ship_max_mateys(%rip), %edx
-    xorq %rax, %rax
-    call printf
-
-    lea bootyWeeklyStr(%rip), %rdi
-    movl ship_booty(%rip), %esi
-    movl ship_max_booty(%rip), %edx
-    xorq %rax, %rax
-    call printf
-
-    lea healthWeeklyStr(%rip), %rdi
-    movl ship_health(%rip), %esi
-    movl ship_max_health(%rip), %edx
-    xorq %rax, %rax
-    call printf
-
-    lea dubloonsWeeklyStr(%rip), %rdi
-    movl ship_dubloons(%rip), %esi
-    xorq %rax, %rax
-    call printf
-
-    lea cannonsWeeklyStr(%rip), %rdi
-    movl ship_cannons(%rip), %esi
-    movl ship_max_cannons(%rip), %edx
-    xorq %rax, %rax
-    call printf
-
-    lea weeksUntilResupplyStr(%rip), %rdi
-    movl voyage_resupply_time(%rip), %esi
-    xorq %rax, %rax
-    call printf
 
     movl $9, %edi                           # Calls RNG function to get random number between 0 and 8 (inclusive), stores result in eax
     call randint
@@ -529,6 +583,13 @@ voyage:
     jmp .Lvoyage.loop.end
 
 .Lvoyage.warship:
+    movl $10, %edi                          # Generates integer between 0 and 9 (inclusive), stores in rax
+    call randint
+
+    lea loot_table(%rip), %rcx              # Stores loot_table[rax] in -12(%rbp), this is how much loot will be rewarded
+    movl (%rcx,%rax,4), %edx
+    movl %edx, -12(%rbp)
+
     movl $2, %edi
     call randint
     test %eax, %eax
@@ -538,14 +599,12 @@ voyage:
 .Lvoyage.warship.manowar:
     lea manowarName(%rip), %rdi
     movq %rdi, -8(%rbp)                     # Warship Name: "Man-o-War"
-    movl $30000, -12(%rbp)                  # Warship reward: 30000 dubloons
     movsd double_002(%rip), %xmm1           # Warship win factor: 0.02
     jmp .Lvoyage.warship.event
 
 .Lvoyage.warship.frigate:
     lea frigateName(%rip), %rdi
     movq %rdi, -8(%rbp)                     # Warship Name: "Frigate"
-    movl $5000, -12(%rbp)                   # Warship reward: 5000 dubloons
     movsd double_01(%rip), %xmm1            # Warship win factor: 0.1
     jmp .Lvoyage.warship.event
 
@@ -638,7 +697,7 @@ voyage:
     lea ship_health(%rip), %rdi
     call updateStat                         # Update
 
-    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    test ship_mateys(%rip), %eax            # Ship health is stored in eax
     jz 1f                                   # If either mateys or health are 0, jump to pyrrhic victory
     jmp 2f                                  # Otherwise, jump to victory
 
@@ -700,7 +759,7 @@ voyage:
     lea ship_health(%rip), %rdi
     call updateStat                         # Update
 
-    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    test ship_mateys(%rip), %eax            # Ship health is stored in eax
     jz 3f
     jmp 4f
                     
@@ -812,7 +871,7 @@ voyage:
     lea ship_health(%rip), %rdi
     call updateStat                         # Update
 
-    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    test ship_mateys(%rip), %eax            # Ship health is stored in eax
     jz 3f
     jmp 4f
                     
@@ -858,7 +917,7 @@ voyage:
     lea ship_health(%rip), %rdi
     call updateStat                         # Update
 
-    or ship_mateys(%rip), %eax              # Ship health is stored in eax
+    test ship_mateys(%rip), %eax            # Ship health is stored in eax
     jz 3f                                   # If either mateys or health are 0, jump to pyrrhic victory
     jmp 4f                                  # Otherwise, jump to victory
 
@@ -936,7 +995,6 @@ voyage:
 main:
     sub $8, %rsp                            # Align stack pointer on 16 bytes, as the code begins misaligned because the CRT's call to main pushes a return pointer to the stack
     call srand_vg
-.Lmain.loop:                                # Begin Game
     movl $300, ship_limes(%rip)
     movl $180, ship_mateys(%rip)
     movl $0, ship_booty(%rip)
@@ -945,7 +1003,63 @@ main:
     movl $300, ship_dubloons(%rip)
     movl $1, ship_level(%rip)
     call updateMax
+.Lmain.loop:                                # Begin Game
+
     call voyage
+    test %rax, %rax
+    jnz .Lmain.gameOver
+
+    movl ship_booty(%rip), %eax
+    addl %eax, ship_dubloons(%rip)          # Convert booty to dubloons at end of each voyage
+    movl $0, ship_booty(%rip)               # Reset booty to 0 at end of each voyage
+
+    cmpl $1, game_state(%rip)
+    je .Lmain.exit
+
+    addl $1, voyage_counter(%rip)
+
+    lea endgamePrompt(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    lea char_buf(%rip), %rdi
+    movl $128, %esi
+    call fgets_stdin
+    movb char_buf(%rip), %al
+    cmpb $121, %al
+    je .Lmain.loop
+
+    # TODO: Add error case for unrecognized input, currently any input other than 'y' will exit the game
+
+.Lmain.gameOver:
+    lea gameOverStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    lea gameOverStatsStr(%rip), %rdi
+    xorq %rax, %rax
+    call printf
+
+    lea voyagesCompletedStatsStr(%rip), %rdi
+    movl voyage_counter(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    lea dubloonsStatsStr(%rip), %rdi
+    movl ship_dubloons(%rip), %esi
+    xorq %rax, %rax
+    call printf
+
+    movl voyage_counter(%rip), %eax
+    imull $2000, %eax
+    addl ship_dubloons(%rip), %eax
+    lea totalScoreStatsStr(%rip), %rdi
+    movl %eax, %esi
+    xorq %rax, %rax
+    call printf
+
+    jmp .Lmain.exit
+
         
 .Lmain.exit:
     add $8, %rsp                             # return stack pointer back to where it was originally so we can return properly
@@ -960,13 +1074,13 @@ str0: .ascii "You are Captain John Birdman, pirate captain of the HMS Pirate Shi
 # Weekly & supply messages
 weekLabel: .ascii "----------Week %d----------\n\0"
 weeksLeftStr: .ascii "Weeks left: %d\n\0"
-levelWeeklyStr: .ascii "Ship level: %d\n\0"
-limesWeeklyStr: .ascii "Limes: %d/%d\n\0"
-mateysWeeklyStr: .ascii "Mateys: %d/%d\n\0"
-bootyWeeklyStr: .ascii "Booty: %d/%d\n\0"
-healthWeeklyStr: .ascii "Ship health: %d/%d\n\0"
-dubloonsWeeklyStr: .ascii "Dubloons: %d\n\0"
-cannonsWeeklyStr: .ascii "Cannons: %d/%d\n\0"
+levelShipDataStr: .ascii "---------SHIP DATA---------\nShip level: %d\n\0"
+limesShipDataStr: .ascii "Limes: %d/%d\n\0"
+mateysShipDataStr: .ascii "Mateys: %d/%d\n\0"
+bootyShipDataStr: .ascii "Booty: %d/%d\n\0"
+healthShipDataStr: .ascii "Ship health: %d/%d\n\0"
+dubloonsShipDataStr: .ascii "Dubloons: %d\n\0"
+cannonsShipDataStr: .ascii "Cannons: %d/%d\n\0"
 weeksUntilResupplyStr: .ascii "Weeks until resupply: %d\n\0"
 
 # General messages
@@ -976,8 +1090,11 @@ bootyLostStr: .ascii "Booty lost: %d\n\0"
 dubloonsPillagedStr: .ascii "Dubloons pillaged: %d\n\0"
 bootyPlunderedStr: .ascii "Booty plundered: %d\n\0"
 anyKeyPrompt: .ascii "Press any key to continue.\n\0"
+noLimesMessage: .ascii "You have run out of limes and your mateys have scurvy! Your mateys will take attrition until you get more limes.\n\0"
+mateysDeadMessage: .ascii "All your mateys have died from scurvy! The HMS Pirate Ship has been sent to Davy Jones' Locker!\n\0"
 newline: .ascii "\n\0"
-resupplyPrompt: .ascii "1: Buy limes\n2: Hire mateys\n3: Repair ship\n4: Buy cannons\n5: Upgrade Ship\nx: Exit\n\0"
+resupplyPrompt: .ascii "---------RESUPPLY---------\n1: Buy limes\n2: Hire mateys\n3: Repair ship\n4: Buy cannons\n5: Upgrade Ship\nx: Exit\n\0"
+endgamePrompt: .ascii "You have completed your voyage! Would you like to embark on another? [y/n]\n\0"
 
 # Purchase strings
 purchasePrompt: .ascii "How much would you like to purchase? (Enter a number)\n\0"
@@ -1046,6 +1163,13 @@ double_100: .double 100.0
 # Input strings
 istrd: .ascii "%d\0"
 istrc: .ascii "%c\0"
+
+# Game over messages
+gameOverStr: .ascii "Game Over!\n\0"
+gameOverStatsStr: .ascii "---------STATS---------\n\0"
+voyagesCompletedStatsStr: .ascii "Voyages completed: %d\n\0"
+dubloonsStatsStr: .ascii "Dubloons: %d\n\0"
+totalScoreStatsStr: .ascii "Total score: %d\n\0"
 
 .section .data
 
