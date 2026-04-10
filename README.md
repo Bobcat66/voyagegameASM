@@ -10,8 +10,8 @@ Your best bet for running ts on windows is probably WSL or VirtualBox.
 ## BUILD INSTRUCTIONS
 Requirements:
 - Linux
-- gcc 13.3+
-- CMake 3.23.3+
+- gcc 13+
+- CMake 3.25+
 
 ### Step 1
 Clone this repository with `git clone https://github.com/Bobcat66/voyagegameASM`  
