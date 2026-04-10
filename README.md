@@ -1,4 +1,4 @@
-This is an an ASM version of VoyageGame, a simple text based game I wrote in freshman year of HS.
+This is an an ASM version of VoyageGame, a simple text based game I wrote in 2021.
 The original python code can be found in the py/ directory. NOTE: This program adheres to the 64-bit SystemV ABI (https://wiki.osdev.org/
 System_V_ABI), and uses AT&T Assembly Syntax. It is designed to be assembled by the GNU assembler, and links to the C standard
 library. The C parts of the code are designed to be compiled with gcc. I've only tested this on my system, which is an AMD64 machine
