@@ -63,9 +63,7 @@ updateStat:
 /*
  * void printShipData()
  *
- * returns a copy of the updated stat's value. 
- * Stat will be set at zero if adding 
- * the delta would make it negative
+ * prints ship data to user
  */
 .type printShipData, @function
 printShipData:
