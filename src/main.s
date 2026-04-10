@@ -264,6 +264,9 @@ resupply:
     cmpb $120, %al
     je .Lresupply.exit
 
+    # TODO: Print something for the user?
+    jmp .Lresupply.loop.end                 # Unrecognized input
+
 .Lresupply.buylimes:
     lea ship_limes(%rip), %rdi
     lea ship_max_limes(%rip), %rsi
